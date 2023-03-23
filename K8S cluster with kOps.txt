@@ -1,0 +1,209 @@
+
+Deploy Application into Kuberenetes using kOps
+##############################################
+
+kOps
+====
+Kubernetes provides excellent container orchestration, but setting up a Kubernetes cluster from scratch 
+can be painful. One solution is to use Kubernetes Operations, or kOps.
+
+kOps is an open-source project which helps you create, destroy, upgrade, and maintain a highly available,
+production-grade Kubernetes cluster. Depending on the requirement, kOps can also provision cloud 
+infrastructure.
+
+kOps is mostly used in deploying AWS and GCE Kubernetes clusters. 
+
+Reference Links:
+https://www.densify.com/kubernetes-tools/kubernetes-kops/#:~:text=What%20is%20kOps%3F,can%20also%20provision%20cloud%20infrastructure.
+
+The Lab steps are given below:
+
+Lab 1: Launch Kubernetes Cluster in AWS (EC2)
+=============================================
+
+Task 1: Launch anchor EC2
+-----------------------
+Open Ubuntu 22.04 EC2 instance.
+Port 22 to be opened.
+
+# Update hostname
+sudo hostnamectl set-hostname kubernetes
+
+# Install these utilities
+sudo apt update
+sudo apt install nano curl wget awscli -y
+
+# create the script to set up the cluster
+vi install-kops-tool.sh
+
+### Start of code ###
+#!/bin/bash
+
+echo "Enter AWS Access Key:"
+read awsaccess
+
+echo "Enter AWS Secret Key:"
+read awssecret
+
+echo "Enter Cluster Name: (ex: my-kube.k8s.local)"
+read clname
+
+echo "Enter an AZ for the cluster:"
+read az
+
+sudo apt update
+
+# download kubectl; give execute permission; move to binary path
+curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.25.0/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
+# download kOps
+sudo curl -LO https://github.com/kubernetes/kops/releases/download/v1.25.0/kops-linux-amd64
+
+# Give executable permission to the downloaded kOps file and move it to binary path
+sudo chmod +x kops-linux-amd64
+sudo mv kops-linux-amd64 /usr/local/bin/kops
+
+# Configure your AWS user profile
+aws configure set aws_access_key_id $awsaccess
+aws configure set aws_secret_access_key $awssecret
+
+# Create a key which can be used by kOps for cluster login
+ssh-keygen -N "" -f $HOME/.ssh/id_rsa
+
+# Create an S3 Bucket where kOps will save all the cluster's state information.
+aws s3 mb s3://$clname
+
+# Expose the s3 bucket as environment variables. 
+export KOPS_STATE_STORE=s3://$clname
+
+# Create the cluster with 2 worker nodes. 
+kops create cluster --node-count=2 --master-size="t3.medium" --node-size="t3.medium" --master-volume-size=30 --node-volume-size=30 --zones=$az --name $clname
+
+# Apply the specified cluster specifications to the cluster 
+kops get cluster
+kops update cluster $clname --yes
+
+# The .bashrc file is a script file that’s executed when a user logs in. 
+echo "export KOPS_STATE_STORE=s3://$clname" >> .bashrc
+
+### End of code ###
+
+#Run the script to setup and configure the Kubernetes cluster. Enter the AWS keys, Availability 
+#Zone, and cluster name when prompted. Cluster name needs to be in the format <name>.k8s.local
+
+chmod +x install-kops-tool.sh 
+
+# execute
+bash install-kops-tool.sh
+OR
+./install-kops-tool.sh
+
+# Enter Access Key 
+xxxxxx
+#and Secret Key
+yyyyyyy
+
+# specify a cluster name. Ex:
+kube102.k8s.local
+
+AZ:us-east-1a (Enter any AZ of your choice)
+
+# Set S3 bucket environment variable. Bucket name will be same as the name of cluster entered 
+# while executing a script
+export KOPS_STATE_STORE=s3://< Cluster_Name >
+Ex:
+export KOPS_STATE_STORE=s3://kube102.k8s.local
+
+# get the cluster list
+kops get cluster
+
+# Export a kubeconfig file for a cluster from the state store using cluster admin user. By default, 
+# the configuration will be saved into a users $HOME/.kube/config file.
+kops export kubecfg --admin
+
+# validate cluster creation. It may take 10+ minutes for cluster creation
+kops validate cluster
+Or
+kops validate cluster --wait 10m --count 3
+
+# Go to aws EC2 dashboard and confirm that the master node + 2 worker nodes exist
+
+# Note: If you need to stop the 3 ec2 instances created by the above process, go to auto scaling 
+# group console and change the min/max/desired numbers of the 2 associated ASGs to zero
+
+
+Task 2: create a Pod using YAML
+------------------------------
+vi 2048-pod.yaml
+or 
+nano 2048-pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+   name: 2048-pod
+   labels:
+      app: 2048-ws
+spec:
+   containers:
+   - name: 2048-container
+     image: blackicebird/2048
+     ports:
+       - containerPort: 80
+
+
+# apply the 2048-pod file
+kubectl apply -f 2048-pod.yaml
+#pod/2048-pod created
+
+# list the newly created pod
+kubectl get pods
+
+
+Task 3: Setup Load Balancer Service
+-----------------------------------
+nano game-svc.yaml 
+
+apiVersion: v1
+kind: Service
+metadata:
+   name: game-svc
+spec:
+   selector:
+      app: 2048-ws
+   ports:
+   - protocol: TCP
+     port: 80
+     targetPort: 80
+   type: LoadBalancer
+
+# apply the config file
+kubectl apply -f game-svc.yaml
+
+# View details of the modified service. 
+kubectl describe svc game-svc
+# The above command will take a few minutes before it can give corect output
+
+# Go to EC2 dashboard, click on Loadbalancer. select the load balancer.
+# Copy the DNS name and paste it into address bar of your browser. 
+
+# Now, you will be able to see the 2048 game and will be able to play it too.
+
+
+Task 4: Cleanup
+---------------
+# Clean up all the resources created in the task
+kubectl delete -f game-svc.yaml
+kubectl delete -f 2048-pod.yaml
+
+kops delete cluster --name=kube102.k8s.local --yes
+
+delete the bucket
+
+
+################################################################
+
+
+
