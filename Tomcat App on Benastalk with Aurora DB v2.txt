@@ -1,0 +1,443 @@
+
+Project: Book Seller
+####################
+You are an e-com book seller. Your simple starting page shows
+the list of authors. Buyers can select the author. The application will 
+list all the books by the author with the price. Once they click order, you 
+have to show a Thank You message. (Note: we don't want to go to other processes
+such as payments, shopping cart etc..). You need to use an Aurora DB to store all  
+the book lists and access it from application. 
+
+ref: https://www3.ntu.edu.sg/home/ehchua/programming/java/JSPByExample.html
+
+
+Book seller
+===========
+
+Task 1: get the code ready
+=========================
+
+# Launch Cloud9 (Ubuntu) 
+
+# Get the code base in tar form: 
+wget https://s3.amazonaws.com/klowdbay.com/YTCodeResources/book-seller.tar.gz
+
+tar -xzvf book-seller.tar.gz
+
+# Install tree utility. 
+sudo apt install tree -y
+ 
+tree .
+# Ensure that you have the files pom.xml, web.xml, index.jsp, order.jsp
+mysql-connector-j-8.0.32.zip (mysql connector)
+
+
+├── book-seller
+│   ├── mysql-connector-j-8.0.32.zip
+│   ├── pom.xml
+│   └── src
+│       └── main
+│           └── webapp
+│               ├── WEB-INF
+│               │   └── web.xml
+│               ├── index.jsp
+                └── order.jsp
+
+5 directories, 7 files
+
+# Install maven package
+sudo apt install maven -y
+mvn --version
+
+# It will display version no. ex: Apache Maven 3.6.0
+
+cd ~/book-seller (goto your folder where the code resides)
+
+# View the code files
+cd ~/environment/book-seller/src/main/webapp
+ls
+cat index.jsp
+cat order.jsp
+
+# goto root directory
+cd ~/environment/book-seller
+
+# Time to build the load
+mvn clean package 
+# You should see 'Build Success' Message
+
+# Observe the '/target' folder to see if warfile 'book-seller-1.0.0.war' is present
+ls ~/environment/book-seller/target
+
+# Create an S3 bucket (or use an existing one). Copy warfile to the S3 bucket. When you create 
+# beanstalk platform, you can upload the code from the S3 bucket.
+aws s3 cp ~/environment/book-seller/target/book-seller-1.0.0.war s3://trainings-2023/ForBeanstalk/
+# Note: trainings-2023 is my bucket which is public. You need to give your bucket name.
+
+
+Task 2: Create Elastic Beanstalk Application
+============================================
+Go to Beanstalk console. Click on Application (left side menu)
+Create beanstalk application : book-seller-101
+Select tomcat platform
+Upload the war file (book-seller-1.0.0.war) from your S3 bucket. 
+For that, Go to S3, click on object and copy the object URL and paste it here.
+
+This will take 10 minutes
+In the meantime, you can move to task 3 (create DB instance) as it can be done in parallel.
+
+
+Task 3: Setup the DB instance
+=============================
+Go to RDS console; Click 'Create database'
+Choose 'standard create'
+Choose 'Aurora-MySQL'
+Under templates, choose Dev/Test; 
+Under settings, db cluster identifier give the name as 'yourname-book-seller'
+ex: unus-book-seller
+Master user name can be admin
+password: enter test1234
+
+DB instance class: choose smallest instance type (ex: burstable type - db.t3.small)
+Dont create Aurora replica
+
+Public access: choose yes
+
+Select a security group which opens MySQL/Aurora 3306 port from 0.0.0.0/0
+
+If not specifically mentioned here, leave other fields with default values
+
+Click 'Create Database'
+
+This will take ~10 minutes
+
+Wait till the DB instance is active.
+
+At this point, check the status of Beanstalk application. Click on environments and ensure that 
+the health of your application's environment shows up as 'Ok'
+
+
+
+Task 4: Create & Update table in the DB 
+=======================================
+1. Go to Cloud9 terminal. Access the database from here. 
+2. Instead of Cloud9, if you are using EC2, then you have to install mySQL : 
+   sudo apt update -y
+   sudo apt install mysql-client-core-8.0
+
+   If you are in cloud9, mysql is already installed
+
+3. Connect to the Aurora RDS endpoint from EC2. You will get endpoint from RDS console. Ex:
+   mysql -h <write endpoint> -P <mySQL port no> -u <user id> -p
+   mysql -h unus-book-seller-instance-1.chkaeykcmlpn.us-east-1.rds.amazonaws.com -P 3306 -u admin -p    
+   
+4. It will ask for password - please enter the password. (ex:test1234) You will get MySQL prompt
+5. CREATE DATABASE ebdb; 
+6. Show databases;
+7. Use ebdb; 
+8. Create a new table in 'ebdb' with following commands
+   create table if not exists books (
+   book_id INT auto_increment,
+   title VARCHAR(250) NOT NULL,
+   author VARCHAR(50),
+   Price FLOAT,
+   Qty INT,
+   PRIMARY KEY (book_id))
+   ENGINE = InnoDB;
+
+9. show tables;
+
+10. Insert a few rows as below
+    INSERT INTO books VALUES (1100, 'Chamber of Secrets', 'Rowling', 11.11, 4);
+    INSERT INTO books VALUES (1103, 'Philosophers Stone', 'Rowling', 10.90, 8);
+    INSERT INTO books VALUES (1105, 'War and Peace', 'Tolstoy', 22.22, 2);
+    INSERT INTO books VALUES (1107, 'Romeo and Juliet', 'Shakespear', 33.33, 5);
+    INSERT INTO books VALUES (1109, 'Othallo', 'Shakespear', 13.99, 7);
+    INSERT INTO books VALUES (1109, 'KingLear', 'Shakespear', 10.79, 3);
+    INSERT INTO books VALUES (1111, 'Death on the Nile', 'Agatha', 44.4, 15);
+    INSERT INTO books VALUES (1113, 'ABC Murders', 'Agatha', 39.4, 11);
+    INSERT INTO books VALUES (1115, 'Anna Kareneena', 'Tolstoy', 55.55, 23);
+
+11. List the entries in the table 
+    SELECT * FROM books;
+
++---------+--------------------+------------+-------+------+
+| book_id | title              | author     | Price | Qty  |
++---------+--------------------+------------+-------+------+
+|    1100 | Chamber of Secrets | Rowling    | 11.11 |    4 |
+|    1103 | Philosophers Stone | Rowling    |  10.9 |    8 |
+|    1105 | War and Peace      | Tolstoy    | 22.22 |    2 |
+|    1107 | Romeo and Juliet   | Shakespear | 33.33 |    5 |
+|    1109 | Othallo            | Shakespear | 13.99 |    7 |
+|    1111 | Death on the Nile  | Agatha     |  44.4 |   15 |
+|    1113 | ABC Murders        | Agatha     |  39.4 |   11 |
+|    1115 | Anna Kareneena     | Tolstoy    | 55.55 |   23 |
++---------+--------------------+------------+-------+------+
+8 rows in set (0.00 sec)
+
+
+12. exit;
+
+
+Task 5: EBS to RDS connection
+=============================
+Now, we need to establish the connection between the Beanstalk application and the DB instance. 
+Go to Beanstalk. Click on 'environment' on the left side menu. Click on the environment name to
+open it. Open 'configuration' menu on the left.
+
+Select category 'software'. click on edit. 
+Under 'Environment Properties', Add below parameters in the text boxes.
+
+RDS_USERNAME: admin
+RDS_PASSWORD: test1234
+RDS_PORT: 3306
+RDS_HOSTNAME: add endpoint from connectivity & Security (of writer instance)
+          Ex: unus-book-seller-instance-1.chkaeykcmlpn.us-east-1.rds.amazonaws.com
+RDS_DB_NAME: ebdb
+
+Click 'Apply'. This may take 1-2 minutes.
+
+
+Task 6: Access your page
+========================
+# Go to beanstalk console. Choose your application. Copy URL to browser
+Ex: http://books-seller.us-east-1.elasticbeanstalk.com/
+
+Select the author and list all his/her books. Select any book and place the order.
+You will get a message 'Thank you for ordering books'. 
+You will get a feedback link. Enter the feedback.  
+Click on 'Back' link and reach the main page.
+
+As the next step, change the list of books in the DB and see if it is getting reflected in
+your book seller page.
+
+
+Task 7: Cleanup
+===============
+1. Terminate RDS
+   Uncheck 'Create final snapshot' and 'Retain automated backups'.
+   Check 'I acknowledge that....'
+
+2. Terminate Elastic Beanstalk application
+
+3. Terminate cloud9
+
+
+
+#########
+Code Base
+#########
+
+pom.xml
+=======
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.efsavage</groupId>
+        <artifactId>book-seller</artifactId>
+        <version>1.0.0</version>
+        <packaging>war</packaging>
+        <name>Book Seller DB </name>
+        <description>Simple ecom built with Java</description>
+
+       <dependencies>
+
+         <dependency>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>8.0.32</version>
+        </dependency>
+        <!-- Thanks for using https://jar-download.com -->
+
+       </dependencies>
+
+        <build>
+                <plugins>
+                        <plugin>
+                                <groupId>org.mortbay.jetty</groupId>
+                                <artifactId>jetty-maven-plugin</artifactId>
+                                <version>8.1.5.v20120716</version>
+                                <configuration>
+                                        <scanIntervalSeconds>0</scanIntervalSeconds>
+                                </configuration>
+                        </plugin>
+                        <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-war-plugin</artifactId>
+                                <version>2.1.1</version>
+                        </plugin>
+                </plugins>
+        </build>
+
+</project>
+
+
+index.jsp
+=========
+
+<html>
+<head>
+  <title>Book Query</title>
+</head>
+<body>
+  <h1>Academy E-Bookstore</h1>
+  <h3>Choose Author(s):</h3>
+  <form method="get">
+          <input type="checkbox" name="author" value="Tolstoy">Tolstoy<br>
+          <input type="checkbox" name="author" value="Shakespear">Shakespear<br>
+          <input type="checkbox" name="author" value="Agatha">Agatha Christie<br>
+          <input type="checkbox" name="author" value="Rowling">J K Rowling<br><br>
+          <input type="submit" value="List the Books and Price"><br>
+  </form>
+ 
+  <%
+    String[] authors = request.getParameterValues("author");
+    if (authors != null) {
+  %>
+  <%@ page import = "java.sql.*" %>
+  <%
+      // build the jdbc url
+
+      // Read RDS connection information from the environment
+      String dbName = System.getProperty("RDS_DB_NAME");
+      String userName = System.getProperty("RDS_USERNAME");
+      String password = System.getProperty("RDS_PASSWORD");
+      String hostname = System.getProperty("RDS_HOSTNAME");
+      String port = System.getProperty("RDS_PORT");
+      String jdbcUrl = "jdbc:mysql://" + hostname + ":" +
+        port + "/" + dbName + "?user=" + userName + "&password=" + password;
+
+      // Load the JDBC driver
+      try {
+        System.out.println("Loading driver...");
+        Class.forName("com.mysql.jdbc.Driver");
+        System.out.println("Driver loaded!");
+      } catch (ClassNotFoundException e) {
+        throw new RuntimeException("Cannot find the driver in the classpath!", e);
+      }
+
+      Connection conn = null;
+      Statement setupStatement = null;
+      Statement readStatement = null;
+      ResultSet resultSet = null;
+      ResultSet rset = null;
+      String results = "";
+      int numresults = 0;
+      String statement = null; 
+
+
+      conn = DriverManager.getConnection(jdbcUrl);
+
+      readStatement = conn.createStatement();
+ 
+      String sqlStr = "SELECT * FROM books WHERE author IN (";
+      sqlStr += "'" + authors[0] + "'";  // First author
+      for (int i = 1; i < authors.length; ++i) {
+         sqlStr += ", '" + authors[i] + "'";  // Subsequent authors need a leading commas
+      }
+      sqlStr += ") AND qty > 0 ORDER BY author ASC, title ASC";
+ 
+      // for debugging
+      System.out.println("Query statement is " + sqlStr);
+      rset = readStatement.executeQuery(sqlStr);
+  %>
+
+      <hr>
+      <form method="get" action="order.jsp">
+        <table border=1 cellpadding=5>
+          <tr>
+            <th>Order</th>
+            <th>Author</th>
+            <th>Title</th>
+            <th>Price</th>
+            <th>Qty</th>
+          </tr>
+  <%
+      while (rset.next()) {
+        int id = rset.getInt("book_id");
+  %>
+          <tr>
+            <td><input type="checkbox" name="id" value="<%= id %>"></td>
+            <td><%= rset.getString("author") %></td>
+            <td><%= rset.getString("title") %></td>
+            <td>$<%= rset.getInt("price") %></td>
+            <td><%= rset.getInt("qty") %></td>
+          </tr>
+  <%
+      }
+  %>
+        </table>
+        <br>
+        <input type="submit" value="Order">
+        <input type="reset" value="Clear">
+      </form>
+      <a href="<%= request.getRequestURI() %>"><h3>Back</h3></a>
+  <%
+      rset.close();
+      readStatement.close();
+      conn.close();
+    }
+  %>
+</body>
+</html>
+
+
+order.jsp
+=========
+<html>
+<head>
+  <title>Academy Bookstore Order Management</title>
+</head>
+<body>
+  <h3>Thank you for ordering books </h3>
+  <h4>Your Feedback, Please </h3>
+  <form method="get">
+    <input type="checkbox" name="feedback" value="Excellent">Excellent
+    <input type="checkbox" name="feedback" value="Good">Good
+    <input type="checkbox" name="feedback" value="Average">Average
+    <br><br><br><input type="submit" value="Submit Feedback">
+  </form>
+ 
+  <%
+  String[] feedbacks = request.getParameterValues("feedback");
+  if (feedbacks != null) {
+  %>
+    <h3>Thank You for the Feedback</h3>
+    <br> <br>
+    <!--<a href="<%= request.getRequestURI() %>">BACK</a>-->
+    <a href="index.jsp">BACK</a>
+  <%
+  }
+  %>
+</body>
+</html>
+
+
+WEB-INF/web.xml
+===============
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+>
+        <!-- This is only here because Maven requires it to make a war. -->
+
+
+Downloading the mySQL connector
+==============================
+Download mysql-connector-j-8.0.31.jar from https://dev.mysql.com/downloads/connector/j/?os=26
+wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-j-8.0.32.zip
+Keep the file in root directory of your maven project
+
+Now include the same in dependency section in pom.xml (already done above)
+
+
+Useful Ref Documents
+====================
+AWS SDK for Java to connect to RDS
+https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Connecting.Java.html
+
+
+
+
+
+
