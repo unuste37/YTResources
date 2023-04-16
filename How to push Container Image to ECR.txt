@@ -1,0 +1,193 @@
+
+Hands on exercise to push a container image to ECR. It also includes steps 
+to pull the image from ECR to create a new container instance. 
+Further, it includes steps to create a new image on top of the old image 
+Stored in ECR
+
+
+Task 1: Create a Private Repository in ECR
+===================================
+Go to ECR console.
+Create new private repository.
+Give an appropriate name. Leave most of the fields with default value 
+
+
+Task 2: Docker Setup in an Ubuntu EC2
+=================================
+
+#Launch an EC2 (Ubuntu)
+#Set hostname to 'Docker' (Optional)
+sudo hostnamectl set-hostname Docker
+
+# Install required packages
+sudo apt-get update
+
+# Install java before installing docker
+sudo apt install default-jre -y
+java --version
+
+# Install docker
+sudo apt-get install docker.io -y
+docker --version
+
+# Enable your user to properly use the docker commands without using sudo for 
+# every command.
+sudo usermod -aG docker ubuntu
+
+
+Task 3: Create a docker image & container (httpd) 
+==========================================
+
+# This is to test that the image & container you create works fine.
+# create docker file
+vi Dockerfile
+
+FROM httpd:2.4
+COPY ./index.html /usr/local/apache2/htdocs/
+
+# Save & quit
+
+# Create index.html which will be copied to the container image
+vi index.html
+
+# Press insert and add the below content
+
+<html>
+  <body>
+    <h1> Hi There !! </h1>
+    <h2> We are learning Docker and ECR </h2>
+    <h3> Today's date is 16th April, 2023 </h3>
+  </body>
+</html>
+
+# Save & quit
+
+#Then, run the commands to build the Docker image:
+sudo docker build -t my-apache2-image .
+
+# list the images
+sudo docker image ls -a
+
+# Create a container instance. Map host's port 8080 to container port 80.
+# container name: apache2-webpage; image name: my-apache2-image
+sudo docker run -d -p 8080:80 --name apache2-webpage my-apache2-image
+
+
+# Use curl command to ensure that the web server is running.
+curl http://localhost:8080
+# you will see index.html
+
+# To access webpage from browser, copy the public DNS name.Add port 8080 at the end
+Ex: http://ec2-35-153-67-142.compute-1.amazonaws.com:8080/
+ 
+
+
+Task 4: Push image to ECR 
+=========================
+# install awscli and configure Access Key Pair
+sudo apt install awscli -y
+
+aws configure
+Enter AKID
+Enter SAK
+
+# change permission for docker.sock.
+sudo chmod 666 /var/run/docker.sock
+
+# Get Push commands from ECR
+Go to ECR console. Goto your repo. Click on 'View Push commands'
+
+# Retrieve an authentication token and authenticate your Docker client to your registry.
+# Use command taken from ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <acnt id>.dkr.ecr.us-east-1.amazonaws.com
+
+# build your docker image with this command 
+docker build -t <name specified in ECR command list> .
+
+# list images
+sudo docker image ls -a
+
+# tag your image so that you can push your image to the repo. 
+docker tag <image name>:latest <acnt id>.dkr.ecr.us-east-1.amazonaws.com/<image>:latest
+
+# Run the following command to push this image to your newly created AWS repository:
+docker push <acnt id>.dkr.ecr.us-east-1.amazonaws.com/<image>:latest
+
+# Go to ECR repositories and click on images. Ensure that your new image is available
+
+
+Task 5: Create a container using the image stored in ECR 
+==============================
+Ref doc:
+https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-pull-ecr-image.html
+
+# List your repos:
+aws ecr describe-repositories --region us-east-1
+
+# List images
+aws ecr list-images --repository-name <repo name> --region us-east-1
+aws ecr tag-resource
+
+# To pull the image
+docker pull aws_account_id.dkr.ecr.us-west-2.amazonaws.com/amazonlinux:latest
+Ex:docker pull <acnt id>.dkr.ecr.us-east-1.amazonaws.com/<image>:latest
+
+# Remove any pre-existing containers which uses the same port (8080)
+docker ps -a
+docker stop 1e6e233c0178 (give correct container id)
+docker rm 1e6e233c0178
+
+# create a container from image stored in ECR
+sudo docker run -d -p 8080:80 --name apache2-webpage <acnt id>.dkr.ecr.us-east-1.amazonaws.com/<image>:latest
+
+
+Task 6: Use the base image stored in ECR to create a new image
+==================================================
+# create new docker file. Get the image URI from ECR.
+# You can get the image URI from ECR > repositories > <repo name> > Images
+vi new-dockerfile
+
+FROM <image URI> 
+COPY ./index-new.html /usr/local/apache2/htdocs/index.html
+
+# Create new index file
+nano index-new.html
+<html>
+  <body>
+    <h1> Image from ECR !! </h1>
+    <h2> This container is created from base image in ECR </h2>
+    <h3> Today's date is <date> </h3>
+  </body>
+</html>
+
+# build new image using new docker file
+sudo docker build -t new-ecr-image -f new-dockerfile .
+
+# list the images
+sudo docker image ls -a
+
+# remove any existing containers
+docker ps -a
+docker stop 1e6e233c0178 (use appt container id)
+docker rm 1e6e233c0178
+
+# Map host's port 8080 to container port 80.
+sudo docker run -dit --name my-running-app -p 8080:80 new-ecr-based-image
+
+# See the webpage created by index.html
+curl http://localhost:8080
+
+# To access from browser, copy the public DNS name.Add port 8080 at the end
+http://ec2-35-153-67-142.compute-1.amazonaws.com:8080/
+
+
+
+Task 7: Clean Up
+=================
+Remove the image from ECR
+Delete the Repository
+
+Terminate the EC2
+
+(Unus, 16th April 2023)
+
