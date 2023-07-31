@@ -1,0 +1,16 @@
+
+Link to YouTube Video: https://www.youtube.com/watch?v=k2j2s2Ma5Mk 
+
+### Copy from below line ###
+
+#!/bin/bash
+sudo apt update -y
+sudo apt install apache2 -y
+sudo service apache2 start
+
+echo "<html>  <body bgcolor = blue>  <h1>Welcome to Unus's page</h1>  <a href = "https://www.youtube.com/channel/UCTer-SCLeHkOd1pqW4WZw9Q"><font color=black> Subscribe to my YouTube Channel </font></a>   </body>  </html>"  > index.html
+
+sudo mv index.html /var/www/html
+
+## Do not copy this line ##
+
