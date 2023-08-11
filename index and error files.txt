@@ -1,0 +1,26 @@
+
+index.html file
+===============
+<html>
+  <title> Unus Web Page </title>
+  <body bgcolor = white>
+     <h1> Welcome to my page </h1>
+     <h2> We have created this static webpage using S3 </h2>
+  </body>
+</html>
+
+
+error.html file
+===============
+<html>
+  <title> Something went wrong...! </title>
+  <body bgcolor = white>
+     <h1> Oops... Something went wrong.....! </h1>
+     <h2> Page will be back soon....! </h2>
+  </body>
+</html>
+
+YouTube Video Link
+==================
+https://www.youtube.com/watch?v=qOcnpH47iYA
+
