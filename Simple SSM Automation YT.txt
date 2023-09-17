@@ -1,0 +1,72 @@
+
+Cheatsheet for Video: https://youtu.be/55sHGJtiVfo 
+
+This lab exercise is to create an Ubuntu EC2 instance with SSM agent installed (using User Data) and then 
+Run an automation script from SSM (Systems Manager) which will install apache2 web server on the EC2. It will also create index.html file in the document route. Once the script execution completes, you will be able to access the simple web page on your browser.
+
+
+Task 1: Launch the Ubuntu EC2
+=======================
+
+Launch the Ubuntu instance
+
+Create an instance profile (role) which has SSM Access Permission 
+(Attach policy AmazonSSMManagedInstanceCore)
+
+Include the below code in user data.
+
+Ubuntu:
+#!/bin/bash
+apt update -y
+snap switch --channel=candidate amazon-ssm-agent
+systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
+
+
+RHEL:
+#!/bin/bash
+dnf update -y
+dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+
+
+
+Task 2: Create the automation script in SSM
+=======================
+Go to Systems Manager (SSM). Click on 'Documents'
+Click on Create Document > Command or Session
+Choose YAML
+
+Type the below code.
+
+---
+schemaVersion: '2.2'
+mainSteps:
+- action: 'aws:runShellScript'
+  name: 'configureApache'
+  inputs:
+      runCommand:
+      - 'sudo apt update -y'
+      - 'sudo apt install apache2 -y'
+      - 'sudo service apache2 start' 
+      - 'sudo echo "<html>  <body bgcolor = white>  <h1>Welcome to Unus' page</h1>  </body> </html>"  > /var/www/html/index.html'
+...
+
+
+
+Task 3: Run the script and access webpage
+=======================
+Go to SSM > Documents > Owned by me.
+Click on your automation document. 
+Click on 'Run Command'
+
+Manually select the EC2 in which you want to run the script.
+
+Run command.
+
+Once the automation script is executed, ensure that you can access the webpage using the EC2's
+Public DNS / Public IP address.
+
+
+Happy Learning !
+
+
+
