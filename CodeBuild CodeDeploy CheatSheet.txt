@@ -1,0 +1,260 @@
+
+CodeBuild and CodeDeploy Hands-On: Help Doc
+========================================
+
+Use Case: You have a simple Java program which you need to compile using Maven compiler.
+Input code is in GitHub. Clone it to Cloud9. Zip it and upload it to S3.
+
+Task 1: Clone code from GitHub
+----------------------------------------------
+1. Launch Cloud9 (Amazon Linux2)
+
+2. Fork the repository 'https://github.com/unuste37/YT-hello-world.git' into your github account.
+   Now, clone that repository into your environment in Cloud9.
+   Ex: git clone https://github.com/<user name>/YT-hello-world.git
+ 
+
+Task 2: Create the BuildSpec file if not present
+----------------------------------------------
+3. Ensure buildspec.yml file is present in the YT-hello-world folder.
+Contents of buildspec.yml is as follows. 
+ 
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      java: corretto17  # Amazon Corretto is a no-cost, multiplatform, production-ready 
+                                      # distribution of the Open Java Development Kit (OpenJDK)
+  pre_build:
+    commands:
+      - echo Nothing to do in the pre_build phase...
+  build:
+    commands:
+      - echo Build started on `date`
+      - mvn install     # This command instructs Apache Maven to compile, test, and package the 
+                                  # compiled Java class files into a build output artifact.
+  post_build:
+    commands:
+      - echo Build completed on `date`
+artifacts:
+  files:
+    - target/hello-world-war-1.0.0.war
+
+
+# If buildspec.yml is not present, then please create it using above code. 
+To create new file, in Cloud9, go to hello-world folder on the left side menu. 
+File > New from template > Text file
+
+type the above code in the file.
+
+
+4. Zip all files in hello-world 
+cd ~/environment/hello-world
+zip -r YT-HelloWorld *  (do not include the root directory itself)
+
+
+
+Task 3: Create an S3 bucket
+---------------------------
+
+5. Create a bucket to store the build input and output. Ex Name: <yourname>-yt-codebuild.
+We will store output also in this bucket, in a separate folder. 
+
+aws s3api create-bucket --bucket <bucket-name> --region us-east-1
+# Note: replace 'region' with actual region name in the above line. 
+
+6. Now, upload the package from your Cloud9 env to the input folder of the bucket
+Ex: aws s3 cp YT-HelloWorld.zip  s3://<your bucket>/input/YT-HelloWorld.zip 
+
+
+Task 4: Create the build project
+--------------------------------
+
+7. Go to CodeBuild console
+On the navigation pane, expand Build, choose Build projects, and then choose Create build project.
+
+8. On the Create build project page, in Project configuration, enter Project name 
+     ex: 'codebuild-demo-yourname'
+
+Ensure that your IAM user id has these access policies attached- AWSCodeBuildAdminAccess, \
+AmazonS3ReadOnlyAccess and IAMFullAccess.
+
+9. In Source, for Source provider, choose Amazon S3.
+For Bucket, choose the bucket you created earlier.
+For S3 object key, enter input/YT-HelloWorld.zip.
+
+10. In Environment, for Environment image, choose Managed image (default selected).
+Compute : EC2
+For Operating system, choose Ubuntu (or Amazon Linux 2.)
+For Runtime(s), choose Standard.
+For Image, choose standard 7.0 for Ubuntu (or corresponding std no in Amazon Linux2)
+
+11. In Service role, choose 'New service role', and leave Role name unchanged.
+
+12. Under Buildspec, 'Use a buildspec file' should be checked. No need to specify the buildspec 
+       file name. By default CodeBuild will use buildspec.yml.
+
+13. In Artifacts, for Type, choose Amazon S3.
+       For Bucket name, choose the bucket you had created earlier.
+
+14. Leave Name blank. In path, specify 'Output'. Leave everything else as default values. 
+
+15. Choose Create build project. Wait for 30 seconds for the project to get created.
+
+
+Task 5 : Run the Build
+-------------------
+16. In the code build console, choose your project just created, and then choose 'Start build'.
+      Go to 'Phase details' and observe the progress
+      Observe the detailed logs under 'Build Logs' in the same page
+
+
+
+
+Task 6: Use CodeDeploy. Launch Ubuntu EC2
+-------------------------
+17. Create an IAM role EC2RoleforCodeDeploy. Attach policy AmazonEC2RoleforAWSCodeDeploy
+      to this role.
+
+18. Launch an Ubuntu machine. Use the above instance profile (EC2RoleforCodeDeploy). 
+   Open ports 22 and 8080. Give the tagname as 'CodeDeploy-date' ex: 'CodeDeploy-Dec25'
+   This is the same EC2 onto which we will deploy the code. 
+
+19. Configure the machine.
+sudo hostnamectl set-hostname CodeDeploy
+
+sudo apt update
+sudo apt install wget unzip awscli -y
+
+
+
+Task 7: Deploy CodeDeploy agent
+-----------------------------
+
+20. Create script to install code deploy agent
+
+vi codedeploy-agent.sh
+# type the below into the script
+
+<Start of code>
+sudo apt-get update
+sudo apt-get install ruby -y
+
+cd /home/ubuntu
+wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
+
+chmod +x ./install
+
+# Install codedeploy
+sudo ./install auto
+
+# Check the status of codedeploy
+sudo service codedeploy-agent status
+<End of Code>
+
+Save & quit
+
+21. Run the script
+chmod +x ./codedeploy-agent.sh
+sudo ./codedeploy-agent.sh auto
+
+# Use below commands if needed
+# sudo service codedeploy-agent stop
+# sudo service codedeploy-agent start
+
+Now, the code deploy agent is deployed in the EC2
+
+
+Task 8: Download the source code and push it to your GitHub repository. 
+-------------------------------
+22. Goto Cloud9. Create a new directory.
+cd ~
+mkdir MyDeployPackage && cd MyDeployPackage 
+
+23. Go to Cloud9. Download your output artifact.
+aws s3 cp s3://unus-yt-codebuild/output/codebuild-demo-nov26/target/hello-world-war-1.0.0.war . 
+
+24. Go to Cloud9. Create your appspec file in the root folder: /home/ec2-user/environment/YT-hello-world  
+vi appspec.yml
+
+version: 0.0
+os: linux
+files:
+  - source: ./hello-world-war-1.0.0.war
+    destination: /var/lib/tomcat9/webapps
+hooks:
+  BeforeInstall:
+    - location: Start-Tomcat.sh
+
+25. Create a script to start Tomcat web server
+vi Start-Tomcat.sh
+
+sudo apt install tomcat9 tomcat9-admin -y
+sudo systemctl enable tomcat9
+
+Save & Quit
+
+
+cd ~/environment/MyDeployPackage 
+zip -r DeployPackage *
+
+aws s3 cp DeployPackage.zip s3://unus-yt-codebuild/output/codebuild-demo-nov26/target/ 
+
+
+
+Task 9: In Code Deploy create an application and deployment group
+--------------------------
+Follow these steps:
+https://docs.aws.amazon.com/codedeploy/latest/userguide/tutorials-github-deploy-application.html
+
+26. Create a CodeDeployService role (Name: CodeDeployService; Attach Policy AWSCodeDeployRole)
+
+27. Go to CodeDeploy in Console. Create application. Name: MyCodeDeploy. Select Compute Platform as EC2/OnPremise
+
+28. Create Deployment Group. Give any easily identifiable name. Use the role created in previous step.
+
+29. Select in-place. Select EC2 instance. 
+    Select CodeDeployDefault.AllAtOnce.  Uncheck 'Enable Load Balancing'.
+
+30. Tag "Name" : "CodeDeploy-Lab" (Use the name you have given to your EC2 instance.
+
+31. Leave others as default and create Deployment group
+
+32. Click on 'Create Deployment'. Choose 'My Application is stored in S3'
+    Give the full path as below
+    ex:s3://unus-yt-codebuild/output/codebuild-demo-dec25/target/DeployPackage.zip
+    Revision file type .zip
+
+33. Under Deployment Group Overrides, select CodeDeployDefault.AllAtOnce
+      Click on 'Create Deployment'
+
+34. Click on 'View Events' in the new window. Observe Deployment Lifecycle events. 
+
+If the deploy fails at first step saying unable to receive lifecycle events, it is due to 
+a) code deploy agent is not installed in the destination EC2.  or b) The proper IAM role is not 
+provided to the EC2. Please check and correct these.  
+
+If you changed the EC2 role after creating deployment group, please 'reboot' the instance once.
+
+
+Task 10
+-------
+35 . Check if your war file is copied to Tomcat root directoy.
+     ll -rt /var/lib/tomcat9/webapps
+
+36. Go to EC2, find the public dns name. copy it to a browser address bar and view the web page.
+     Ex: http://<54.91.67.49>:8080/hello-world-war-1.0.0/
+     Do not use https.
+ 
+
+Task 11 Cleanup
+----------------
+37. Delete S3 bucket
+aws s3api delete-bucket --bucket unus-YT-codebuild-input
+38. Delete EC2. Delete the CodeDeploy Application. Delete CodeBuild project
+39. Delete Cloud9
+
+#########################################################
+                       E    N    D
+#########################################################
+
