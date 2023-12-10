@@ -1,0 +1,166 @@
+
+####################
+CodePipeline Hands-On - CheatSheet 
+####################
+
+Hands-on Project:  
+In Part 1, deploy a simple webapp to EC2 using CodeDeploy
+In Part 2, automate the deployment using CodePipeline
+
+
+Task 1: Launch Ubuntu EC2
+-------------------------
+1. Create an IAM role 'RoleGivenToEC2ToUseCodeDeploy'. Attach policy AmazonEC2RoleforAWSCodeDeploy
+   to this role.
+
+2. Launch an Ubuntu 22.04 machine. Use the above instance profile / IAM role. 
+   Open ports 22 and 80. Give the tagname as 'CodeDeploy-date' ex: 'CodeDeploy-June26'
+   This is the same EC2 onto which we will deploy the code. 
+
+3. Configure the EC2.
+sudo hostnamectl set-hostname CodeDeploy
+
+sudo apt update
+sudo apt install wget unzip awscli -y
+
+aws configure
+enter AKID
+enter SAKID
+region: us-east-1
+
+smoke test: 
+aws s3 ls
+
+
+Task 2: Deploy CodeDeploy agent
+-----------------------------
+
+4. Create script to install code deploy agent
+vi codedeploy-agent.sh
+# type the below into the script
+
+sudo apt-get update
+sudo apt-get install ruby -y
+
+cd /home/ubuntu
+wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
+
+chmod +x ./install
+
+# Install codedeploy
+sudo ./install auto
+
+# Check the status of codedeploy
+sudo service codedeploy-agent status
+
+Save & quit
+
+5. Run the script
+chmod +x ./codedeploy-agent.sh
+sudo ./codedeploy-agent.sh auto
+
+
+# Use below commands if needed
+# sudo service codedeploy-agent stop
+# sudo service codedeploy-agent start
+
+
+Task 3: Set up your Github repository. 
+-------------------------------
+6. You can fork the below repository into your account. 
+   https://github.com/unuste37/YT-CodeDeploy
+This includes the web index file which we will deploy to our EC2.
+
+
+Task 4: In Code Deploy create an application and deployment group
+--------------------------
+7. Create a CodeDeployService role with name 'RoleGivenToCodeDeployService' and Attach Policy 'AWSCodeDeployRole'.
+    This role will be given to CodeDeploy when you create the service. It enables 'CodeDeploy' tpo access the 
+    required resources. 
+
+8. Go to CodeDeploy in Console. Create application. Select Compute Platform as EC2/OnPremise
+
+9. Create Deployment Group. Give any easily identifiable name. Use the role created in previous step.
+
+10. Select Deployment Type 'in-place. Select Env configuration: Amazon EC2 instances.
+    Enter Name tag of the EC2 instance which we will upgrade using CodeDeploy/Pipeline. 
+
+11. Deployment Settings: Select CodeDeployDefault.AllAtOnce.  Uncheck 'Enable Load Balancing'.
+
+12. Leave other fileds as default and create Deployment group
+
+
+Task 5: Create Deployment
+-------------------------
+13. Click on 'Create Deployment'. Choose 'My Application is stored in Github'
+
+14. Add github token name (any name which was not used earlier. ex: github-connect-2023). 
+    Connect to GitHub. It will pop out a new window. Enter Github user id and password. 
+    Click confirm. This is required to connect CodeDeploy with Github. 
+    You will get message "Application pipeline-demo successfully bound to github-connect-aug22 GitHub token"
+
+15. repository name : <username>/<repo name> (ex:unuste37/YT-CodeDeploy) (use appropriate name in this format)
+    Get the commit id from the repository (Click on commits)
+
+16. Under Deployment Group Overrides, select CodeDeployDefault.AllAtOnce. (this is default)
+    Click on 'Create Deployment'
+
+17. Click on 'View Events' in the new window. Observe Deployment Lifecycle events. 
+
+If the deploy fails at first step saying unable to receive lifecycle events, it is due to 
+a) code deploy agent is not installed in the destination EC2.  or b) The proper IAM role is not 
+provided to the EC2. Please check and correct these.  c) Or the connectivity with GitHub did not work
+
+If you changed the EC2 role after creating deployment group, please 'reboot' the instance once.
+
+18. Goto EC2 dashboard. Get the public DNS name. Copy the same to browser address bar and view the 
+web page.
+It should display a web page with following message: "Congratulations To Everyone. Deployment is 
+successful. CodePipeline can orchestrate the CI/CD process."
+
+
+Now, Automate the above using Code Pipeline
+==============================
+
+Task 6: Set up the pipeline and execute it manually
+---------------------------------------------------
+1. Goto code pipeline and create a new code pipeline. 'Create Pipeline'.
+   Pipeline name : 'pipeline-yourname' ex: pipeline-unus
+   Pipeline type : V2
+
+2. Service Role: 'New service role'. Leave everything else as default. Click 'Next'
+
+3. In 'source provider', choose 'GitHub version2'
+
+4. Click on Connect to GitHub (or choose an existing connection)
+
+5. Choose the repository name.
+
+6. Pipeline trigger: 'Push in a branch'.  This will ensure that any new commit in the
+   Github repository will trigger the pipeline.
+
+7. Enter branch name (ex: master)
+
+8. Leave everything else 'default' and click on Next
+
+9. Skip build stage
+
+10. Select AWS CodeDeploy as Deploy provider. Select the application name and deployment group created earlier
+
+11. Click 'Next'. Click 'Create Pipeline'
+
+12. Observe the progress of the code pipeline stages.
+
+13. Once the pipeline is sucessfully completed, goto EC2 dashboard, copy the public DNS of the 
+    target EC2 and paste that into browser address bar. Observe the resulting web page.
+
+
+Task 7: CodePipeline troggered by new commit
+--------------------------------------------
+14. Now, make a change to the index.html file and observe that the pipeline is triggered automatically.
+
+15. Go to EC2 dashboard. Using the public DNS name, open the webpage. You should see the revised web page. 
+
+
+
+
