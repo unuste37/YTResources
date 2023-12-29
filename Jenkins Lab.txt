@@ -1,0 +1,204 @@
+
+#########################################
+Setup Jenkins on EC2 and Build load using Jenkins  
+#########################################
+
+Task 1: Launch an EC2
+=====================
+# You may use the below specs. 
+# region used: us-east-1 (N Virginia) region. 
+# Launch Ubuntu 22.04 LTS t2.micro EC2 machine. 
+# Note: In the security group, open ports 22, 80, 8080 and 9999. 
+# Use the EC2 Name tag "Jenkins'; Use a key pair
+
+
+Task 2: Jenkins Installation
+============================
+# After the EC2 server is up & running, SSH into the machine and do the below:
+
+sudo apt update
+sudo apt install wget unzip -y
+
+sudo apt install awscli -y
+
+aws configure
+enter your Access Key 
+enter your Secret Access Key
+# To test if the config has worked, you can use below aws cli command to list your S3 buckets.
+# If the config is not proper, you will get error. Else you will get your S3 bucket list. 
+aws s3 ls
+
+# create a small script which will install Jenkins
+vi MyJenkins.sh
+
+# Type the below code into MyJenkins.sh
+
+## start of code #####
+
+sudo apt install default-jre -y
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+
+sudo systemctl start jenkins.service
+sudo systemctl status jenkins
+
+echo "InitialAdminPassword"
+echo "-------------------"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+## end of code ####
+
+#Save & quit
+
+
+# Provide execute permission
+chmod +x MyJenkins.sh
+
+# execute the shell script to launch Jenkins
+./MyJenkins.sh
+
+# Type 'Q' to get back prompt
+
+# Exit & SSH into the machine again. New hostname will appear now
+
+jenkins --version
+
+# Use below command to find ip address of the Jenkins server
+curl ifconfig.me
+
+# Check if Jenkins landing page is appearing: 
+http://18.234.238.69:8080/ # Use your respective ip address
+
+
+Task 3: Configure Jenkins
+=========================
+# Get the initial password for Jenkins from the corresponding folder in Jenkins server.
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# copy the password. 
+ex: e606c92ebb3b430ca5c2e480f5257e1f
+
+# Now, go to the browser and enter Jenkins URL
+http://54.82.104.49:8080/
+
+# Under Unlock Jenkins, enter the above Initial password. Continue.
+Click on Install suggested Plugins on Customize Jenkins page.
+
+# Once the plugins are installed, it gives you the page where you can create new admin user id 
+# and password. 
+
+Enter user id and password. Save & Continue. 
+# To keep things simple, choose a simple user id and password. For ex: admin; admin
+# Needless to say, in real life, you must keep the user ids and passwords separate.
+
+In next step, on Instance Configuration Page, verify your Jenkins Public IP and Port Number then 
+click on Save and Finish
+
+Start Using Jenkins
+
+# You will be prompted to the Jenkins Home Page
+
+Click on Manage Jenkins > Plugins
+
+Click on Available Plugins. Search for 'Maven'. Select 2 plugins as listed below:
+ - Maven Integration Plugin 
+and click 'Install'
+
+Once the installation is completed,  Go back to 'Manage Jenkins'. 
+
+Click on 'Tools'
+
+Inside Tools, look for Maven Installations and click Add Maven. 
+Give the Name as Maven-yourname, choose Version as 3.9.6 (or latest) and Click 'Save'.
+
+
+Task 4: Setup GitHub repository
+===============================
+
+Create your Github account
+Fork the following repository and create your own repository 'jenkins-proj'.
+Repository: https://github.com/unuste37/YT-Jenkins
+
+
+Task 5: Create a build project
+==============================
+Now you need to make a project for your application build. For that, select 'New Item' from the 
+Home Page of Jenkins.
+
+Enter an item name as 'jenkins-proj' and select the project as Maven Project and then click OK.
+
+After you click on OK, you will be prompted to the configure page inside 'jenkins-proj' project. 
+Go to Source Code Management tab, select Source Code Management as Git. You need to provide the 
+GitHub Repository URL and GitHub Account Credentials. In the Credentials field, you have to 
+click Add. Then click on Jenkins. 
+
+Then you will get prompted for Jenkins Credentials Provider page of Jenkins. Under Add Credentials, 
+you can add your GitHub Username, Password and Description. Then click on Add.
+
+After returning to the Source Code Management Page, click on Credentials and Choose your 
+GitHub Credentials.
+
+Keep all the other values as default and select Build menu on the left side.
+Inside Goals and options add 'clean package' and save the configuration by clicking on Save.
+
+# 'clean package' (all small letters) command clears the target directory and Builds the project and 
+# packages the resulting JAR file into the target directory. 
+
+Get back to Maven project 'jenkins-proj'. Click on 'Build Now' for building the .war file 
+for your application.
+
+# You can go to Workspace > dist folder to see that the .war file is created there.
+# war file will be created in /var/lib/jenkins/workspace/jenkins-proj/target/
+
+
+Task 6: Install and Configure Tomcat for Deploying our Application on Jenkins server
+====================================================================================
+
+sudo apt install tomcat9 tomcat9-admin -y
+
+sudo systemctl enable tomcat9
+
+# Now we need to navigate to server.xml to change the Tomcat port number from 8080 to 9999, 
+# as port number 8080 is already being used by Jenkins website.
+sudo vi /etc/tomcat9/server.xml
+#Change 8080 to 9999 in 1 place. (line 69 / red color font) 
+
+#Now restart the system for the changes to take effect
+sudo service tomcat9 restart
+sudo service tomcat9 status
+
+# We need to copy the .war file created in the previous Jenkins build from Jenkins workspace 
+# to tomcat webapps directory to serve the web content
+
+sudo cp -R /var/lib/jenkins/workspace/jenkins-proj/target/welcome-page-war-1.0.war /var/lib/tomcat9/webapps
+
+# Once this is done, go to your browser and enter Jenkins Server Public IP address followed 
+# by port 9999 and path 'welcome-page-war-1.0' and you can see tomcat is now serving your web page
+# (URL:  http://< Your Jenkins Public IP >:9999/welcome-page-war-1.0/)
+http://18.234.238.69:9999/welcome-page-war-1.0/
+
+# You will see a simple html page which says "Welcome! We are learning DevOps!!"
+
+
+Task 7: Clean Up
+================
+
+# Terminate the EC2; You may also delete any security group you created.
+
+# In case if you are continuing to use Jenkins, it is better to remove the tomcat server.
+# Else it may slow down Jenkins
+sudo service tomcat9 stop
+sudo apt remove tomcat9
+
+
+##########
+The End
+##########
+
