@@ -1,0 +1,80 @@
+
+#################
+Glue & Athena CheatSheet
+#################
+
+Task 1: Upload CSV file to S3 bucket
+==============================
+1. Select an S3 bucket. Create a folder 'GlueLab'.
+2. Create a 'csv' file.
+
+notepad countries-data.csv
+
+## File start ##
+Continent,Country,GDP (T$),Language,Population (Mil)
+Europe,Spain,1.5,Spanish,48
+LatinAmerica,Mexico,1.6,Spanish,129
+Europe,Russia,2.1,Russian,146
+LatinAmerica,Brazil,2.1,Portugese,203
+NorthAmerica,Canada,2.1,English,40
+Europe,Italy,2.2,Italian,59
+Europe,France,2.9,French,68
+Europe,UK,3.2,English,67
+Europe,Germany,4.3,German,84
+Asia,Japan,4.4,Japanese,124
+Asia,India,3.7,Hindi,1392
+Asia,China,19.4,Mandarin,1411
+NorthAmerica,USA,26.9,English,335
+## File end ##
+
+3. Upload the csv file to the 'GlueLab' folder in S3 bucket
+
+
+Task 2: Create Glue Crawler
+======================
+Click 'AddTablesUsingCrawler'
+
+Crawler name : mylar-crawler ; Click Next
+
+Is your data mapped to Glue Tables? Not Yet
+
+Data Source: Add Data source
+
+Network connection - leave it
+Select the S3 bucket and select the folder. Do not select the exact file
+Crawl all subfolders.
+
+Leave other fields with default values. 'Add an S3 data source'; Next
+
+Create New IAM role. Give name ex: AWSGlueServiceRole-GlueLab-<date>
+Next
+
+Select 'Default' database; Crawler schedule - choose on-demand (which is default)
+
+Create Crawler; 
+Run Crawler once it is ready.  Wait till the Table is ready. View the table where you can see the schema.
+
+Now, go to Athena to query the data.
+
+
+Task 3: Create an Athena Query
+======================
+Choose Datasource 'AWSdataCatalogue'
+Check list of Tables and ensure that your Glue table is listed.
+
+In query edit area, add your query and run. 
+Start with SELECT * FROM <your glue catalog table name>
+
+
+Task 4: Clean Up
+================
+
+# Delete the S3 folder and file if you are not planning to reuse
+# Delete the Glue Catalog Table
+# Delete the new IAM role you had created
+
+
+##########
+The End
+##########
+
