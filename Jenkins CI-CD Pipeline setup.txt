@@ -1,0 +1,278 @@
+##########################################
+# Title : Setup a Simple CI-CD pipeline using Jenkins
+# Lab Description: Use Jenkins to implement a Continuous Deployment 
+# pipeline. Use webhook to trigger jenkins build whenever there is any 
+# new commits in your source repository. 
+# Tomcat server should be running continuously. whenever new .war file is
+# created by jenkins build, use Jenkins execute shell (post steps in 
+# project) to move war file to document root of tomcat9.
+###########################################
+
+Task 1: Launch an EC2
+=====================
+# You may use the below specs. 
+# region used: us-east-1 (N Virginia) region. 
+# Launch Ubuntu 22.04 LTS t2.medium EC2 machine (4GB RAM). 
+# Note: In the security group, open ports 22, 80, 8080 and 9999. 
+# Use the EC2 Name tag "Jenkins'; Use a key pair
+
+
+Task 2: Jenkins Installation
+============================
+# After the EC2 server is up & running, SSH into the machine and do the below:
+
+sudo apt update
+
+# create a small script which will install Jenkins
+vi MyJenkins.sh
+
+# Type the below code into MyJenkins.sh
+
+## start of code #####
+
+sudo apt install default-jre -y
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+
+sudo systemctl start jenkins.service
+sudo systemctl status jenkins
+
+echo "InitialAdminPassword"
+echo "-------------------"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+## end of code ####
+
+#Save & quit
+
+
+# Provide execute permission
+chmod +x MyJenkins.sh
+
+# execute the shell script to launch Jenkins
+./MyJenkins.sh
+
+# Type 'Q' to get back prompt
+
+# Exit & SSH into the machine again. New hostname will appear now
+
+# Use below command to find ip address of the Jenkins server
+curl ifconfig.me
+
+# Check if Jenkins landing page is appearing: 
+ex: http://54.159.189.193:8080/ # Use your respective ip address
+
+
+Task 3: Configure Jenkins
+=========================
+# Get the initial password for Jenkins from the corresponding folder in Jenkins server.
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# copy the password. 
+ex: 93d630a580b5403e809724666b29a903
+
+# Now, go to the browser and enter Jenkins URL
+http://3.80.149.212:8080/ (ip will be different for you)
+
+
+# Under Unlock Jenkins, enter the above Initial password. Continue.
+Click on Install suggested Plugins on Customize Jenkins page.
+
+# Once the plugins are installed, it gives you the page where you can create new admin 
+# user id and password. 
+
+Enter user id and password. Save & Continue. 
+# To keep things simple, choose a simple user id and password. For ex: admin; admin
+# Needless to say, in real life, you must keep the user ids and passwords separate.
+
+In next step, on Instance Configuration Page, verify your Jenkins Public IP and Port 
+Number then click on Save and Finish
+
+Start Using Jenkins
+
+# You will be prompted to the Jenkins Home Page
+
+Click on Manage Jenkins > Plugins
+
+Click on Available Plugins. Search for 'Maven'. Select 2 plugins as listed below:
+ - Maven Integration Plugin 
+and click 'Install'
+
+Once the installation is completed,  Go back to 'Manage Jenkins'. 
+
+Click on 'Tools'
+
+Inside Tools, look for Maven Installations and click Add Maven. 
+Give the Name as Maven-yourname, choose Version as 3.9.6 (or latest) and Click 'Save'.
+
+
+Task 4: Setup GitHub repository
+===============================
+
+Create your Github account
+Fork the following repository and create your own repository 'jenkins-proj' (any name is ok)
+Repository: https://github.com/unuste37/YT-Jenkins.git
+
+
+Task 5: Create a build project
+==============================
+Now you need to make a project for your application build. For that, select 'New Item' from the Home Page of Jenkins.
+
+Enter an item name as 'cicd-proj' and select the project as Maven Project and then click OK.
+
+After you click on OK, you will be prompted to the configure page inside 'cicd-proj' project. 
+Go to Source Code Management tab, select Source Code Management as Git. You need to provide the GitHub Repository URL and GitHub Account Credentials. In the Credentials field, you have to click Add. Then click on Jenkins. 
+
+Then you will get prompted for Jenkins Credentials Provider page of Jenkins. Under Add Credentials, you can add your GitHub Username, Password and Description. Then click on Add.
+
+After returning to the Source Code Management Page, click on Credentials and Choose your 
+GitHub Credentials.
+
+Keep all the other values as default and select Build menu on the left side.
+Inside Goals and options add 'clean package' and save the configuration by clicking on Save.
+
+# 'clean package' (all small letters) command clears the target directory and Builds 
+# the project and packages the resulting JAR file into the target directory. 
+
+# Get back to Maven project 'cicd-proj'. Click on 'Build Now' for building the .war  
+# file for your application.
+
+# You can go to Workspace > dist folder to see that the .war file is created there.
+# war file will be created in /var/lib/jenkins/workspace/cicd-proj/target/
+
+
+
+Task 6:Configure Git WebHook in Jenkins
+=======================================
+# In next step, we will configure an automatic webhook from Github to jenkins. 
+# This will ensure that any change in code will immediately trigger a loadbuild. 
+
+Go to Jenkins webpage. Manage Jenkins > Manage Plugins
+
+Go to Available Tab, Search for GitHub Integration. Click on the GitHub Integration Plugin 
+and then on Install without restart
+
+Once the installation is completed, click on Go back to the top page
+
+In your cicd-proj project, Click on Configure. Go to Build Triggers and enable 
+GitHub hook trigger for GITScm polling. Then Save
+
+Go to your GitHub website, and inside YT-jenkins repository under Settings Tab, 
+then Webhooks. Click on the Add webhook
+
+Fill the details as below.
+Payload URL : http://<<jenkins-publicIP>>/github-webhook/
+         Ex : http://34.202.157.230:8080/github-webhook/
+Content type: application/json
+Leave other fields with default values.
+Click 'Add webhook'
+
+
+Task 7: Verify the working of WebHook by editing the Source Code
+================================================================
+Now change your source code in the YT-Jenkins repository by editing 
+src/main/webapp/index.jsp file.
+Make a minor change and commit
+
+As the source code got changed, Jenkins will get triggered by the WebHook and will 
+start building the new source code. Go to Jenkins and you can see a build is happening.
+
+Observe successful load build in Jenkins page.
+
+
+Task 8: Tomcat server setup in your machine
+===========================================
+On your Jenkins EC2, do the below:
+
+vi tomcat.sh
+
+## start of code
+sudo apt install tomcat9 tomcat9-admin -y
+sudo systemctl enable tomcat9
+
+# In the tomcat config file, replace port no 8080 with 9999 
+sudo sed -i 's/8080/9999/g' /etc/tomcat9/server.xml
+
+#Now restart the system for the changes to take effect
+sudo service tomcat9 restart
+## end of code
+
+# excute the script
+chmod +x tomcat.sh
+./tomcat.sh
+
+# check tomcat status
+sudo service tomcat9 status
+# It should be in running state.
+
+# Now create webapp.sh. This script will be executed from Jenkins to copy the 
+# war file to tomcat webapps root directory. 
+
+vi webapp.sh
+##start of code ###
+# Copy the .war file from the load build to tomcat webapps root directory
+sudo cp -R /var/lib/jenkins/workspace/cicd-proj/target/welcome-page-war-1.0.war /var/lib/tomcat9/webapps
+## end of code ##
+
+# add execute permission
+chmod +x webapp.sh
+
+## add below line in /etc/sudoers
+sudo vi /etc/sudoers
+# add the line at the end.
+jenkins ALL = NOPASSWD: /home/ubuntu/webapp.sh
+
+# save & quit
+:wq!
+
+
+Task 9: Jenkins post-step setups
+================================
+Go to your Jenkins Home page, click on drop-down cicd-proj project, select 
+Configure on the left tab. 
+
+Go to Post Steps Tab, select 'Run only if the build succeeds'.
+Then, click on Add post-build step and select 'Execute shell' from the drop-down 
+and type the following commands in the shell and Save
+
+##start of execute shell commands ###
+sudo /home/ubuntu/webapp.sh
+## end of execute shell ##
+
+
+
+Task 10 :View the resulting web page
+========================
+Now you can build your cicd-proj project by clicking on Build Now or by making a 
+small change in Github files. 
+
+Once the loadbuild is successful, to access the tomcat server page, go to your browser 
+and enter Jenkins Server Public IP address followed 
+# (URL:  http://< Your Jenkins Public IP >:9999/welcome-page-war-1.0/)
+http://3.80.149.212/:9999/welcome-page-war-1.0/
+
+# You will see a simple html page which says "Welcome! We are learning DevOps!!"
+
+
+Task 11: Clean Up
+================
+# Terminate the EC2; You may also delete any security group you created.
+
+# In case if you are continuing to use Jenkins, it is better to remove the tomcat server.
+# Else it may slow down Jenkins
+sudo service tomcat9 stop
+sudo apt remove tomcat9
+
+
+
+##########
+The End
+##########
+
