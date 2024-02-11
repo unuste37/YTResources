@@ -1,0 +1,152 @@
+##########################################
+# Title : Setup a Simple CI-CD pipeline using Jenkinsfile
+# Lab Description: Use Jenkinsfile to implement a Continuous Deployment 
+# pipeline. 
+###########################################
+
+Task 1: Launch an EC2
+=====================
+# You may use the below specs. 
+# region used: us-east-1 (N Virginia) region. 
+# Launch Ubuntu 22.04 LTS t2.micro or t2.medium EC2 machine. 
+# Note: In the security group, open ports 8080 and 22. 
+# Use the EC2 Name tag "Jenkins'; Use a key pair
+
+
+Task 2: Jenkins Installation
+============================
+# After the EC2 server is up & running, SSH into the machine and do the below:
+
+sudo apt update
+
+# create a small script which will install Jenkins
+vi MyJenkins.sh
+
+# Type the below code into MyJenkins.sh
+
+## start of code #####
+
+sudo apt install default-jre -y
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+
+sudo systemctl start jenkins.service
+sudo systemctl status jenkins
+
+echo "InitialAdminPassword"
+echo "-------------------"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+## end of code ####
+
+#Save & quit
+
+
+# Provide execute permission
+chmod +x MyJenkins.sh
+
+# execute the shell script to launch Jenkins
+./MyJenkins.sh
+
+# Type 'Q' to get back prompt
+
+# Exit & SSH into the machine again. New hostname will appear now
+
+# Use below command to find ip address of the Jenkins server
+curl ifconfig.me
+
+# Check if Jenkins landing page is appearing: 
+http://54.159.189.193:8080/ # Use your respective ip address
+
+# Install Maven in EC2
+sudo apt install maven 
+
+
+
+Task 3: Configure Jenkins
+=========================
+# Get the initial password for Jenkins from the corresponding folder in Jenkins server.
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# copy the password. 
+ex: 93d630a580b5403e809724666b29a903
+
+# Now, go to the browser and enter Jenkins URL (use your respective URL)
+http://34.203.252.149:8080/
+
+# Under Unlock Jenkins, enter the above Initial password. Continue.
+Click on Install suggested Plugins on Customize Jenkins page.
+
+# Once the plugins are installed, it gives you the page where you can create new admin 
+# user id and password. 
+
+Enter user id and password. Save & Continue. 
+# To keep things simple, choose a simple user id and password. For ex: admin; admin
+# Needless to say, in real life, you must keep the user ids and passwords separate.
+
+In next step, on Instance Configuration Page, verify your Jenkins Public IP and Port 
+Number then click on Save and Finish
+
+Start Using Jenkins
+
+
+
+Task 4: Setup GitHub repository
+===============================
+
+Create your Github account
+Fork the following repository and create your own repository 'jenkins-proj'.
+Repository: https://github.com/unuste37/YT-hello-world.git
+
+
+Task 5 : Create a Pipeline project
+========================
+Click 'New Item'
+demo-pipeline
+select pipeline. click Ok
+
+Under configure:
+Select pipeline
+
+Copy the below code under script
+
+pipeline {
+    agent any 
+    stages {
+        stage('Clone from GitHub') {
+            steps {
+                echo 'Clone stage'
+                git 'https://github.com/<your GitHub acnt>/YT-hello-world.git' // Note - use your GitHub repo
+            }
+        }
+        
+        stage('Build Stage') {
+            steps {
+                echo 'Build Stage'
+                sh 'mvn clean package'
+            }
+        }
+    }
+}
+
+Now click on 'Build Now'
+
+Observe the successful load build.
+
+
+Task 6: Clean Up
+================
+# Terminate the EC2; You may also delete any security group you created.
+
+
+#########
+The End
+#########
+
