@@ -1,0 +1,261 @@
+##########################################
+# Title : Setup a Simple CI-CD pipeline using Jenkinsfile
+# Lab Description: Use Jenkinsfile to implement a CI-CD pipeline. Use webhook to trigger 
+# you project whenever there is any new commits in your source repository. 
+# Tomcat server should be running continuously. jenkinsfile will trigger loadbuild,
+# whenever new .war file is created, use Jenkinsfile to move war file to document root 
+# of tomcat9.
+###########################################
+
+Task 1: Launch an EC2
+=====================
+# You may use the below specs. 
+# region used: us-east-1 (N Virginia) region. 
+# Launch Ubuntu 22.04 LTS t2.medium EC2 machine. 
+# Note: In the security group, open ports 22, 8080 and 9999. 
+# Use the EC2 Name tag "Jenkins'; Use a key pair
+
+
+Task 2: Jenkins Installation
+============================
+# After the EC2 server is up & running, SSH into the machine and do the below:
+
+sudo apt update
+
+# create a small script which will install Jenkins
+vi MyJenkins.sh
+
+# Type the below code into MyJenkins.sh
+
+## start of code #####
+
+sudo apt install default-jre -y
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+
+sudo systemctl start jenkins.service
+sudo systemctl status jenkins
+
+echo "InitialAdminPassword"
+echo "-------------------"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+## end of code ####
+
+#Save & quit
+
+
+# Provide execute permission
+chmod +x MyJenkins.sh
+
+# execute the shell script to launch Jenkins
+./MyJenkins.sh
+
+# Type 'Q' to get back prompt
+
+# Exit & SSH into the machine again. New hostname will appear now
+
+# Use below command to find ip address of the Jenkins server
+curl ifconfig.me
+
+# Check if Jenkins landing page is appearing: 
+http://35.173.247.39:8080/ # Use your respective ip address
+
+
+
+Task 3: Configure Jenkins
+=========================
+# Get the initial password for Jenkins from the corresponding folder in Jenkins server.
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# copy the password. 
+ex: 93d630a580b5403e809724666b29a903
+
+# Now, go to the browser and enter Jenkins URL. Ex:
+http://34.201.251.15:8080/
+
+# Under Unlock Jenkins, enter the above Initial password. Continue.
+Click on Install suggested Plugins on Customize Jenkins page.
+
+# Once the plugins are installed, it gives you the page where you can create new admin 
+# user id and password. 
+
+Enter user id and password. Save & Continue. 
+# To keep things simple, choose a simple user id and password. For ex: admin; admin
+# Needless to say, in real life, you must keep the user ids and passwords separate.
+
+In next step, on Instance Configuration Page, verify your Jenkins Public IP and Port 
+Number then click on Save and Finish
+
+Start Using Jenkins
+
+
+
+Task 4: Setup GitHub repository
+===============================
+
+Create your Github account
+Fork the following repository and create your own repository 'jenkins-proj'.
+Repository: https://github.com/unuste37/YT-Jenkins.git
+
+
+Task 5 : Create a Pipeline project
+========================
+Click 'New Item'
+demo-pipeline
+select pipeline. click Ok
+
+Under configure:
+Select pipeline
+
+Copy the below code under script
+
+pipeline {
+    agent any 
+    stages {
+        stage('Clone from GitHub') {
+            steps {
+                echo 'Clone stage'
+                git 'https://github.com/<your GitHub acnt>/YT-Jenkins.git' // Note - use your GitHub repo
+            }
+        }
+        
+        stage('Build Stage') {
+            steps {
+                echo 'Build Stage'
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Deploy Stage') {
+            steps {
+                echo 'Deploy Stage'
+                sh 'sudo cp -R /var/lib/jenkins/workspace/demo-pipeline/target/welcome-page-war-1.0.war /var/lib/tomcat9/webapps'
+            }
+        }
+
+    }
+}
+
+Now click on 'Build Now' after commenting out the deploy stage. 
+
+Observe the successful load build.
+
+
+
+Task 6: Tomcat server setup in your machine
+===========================================
+On your Jenkins EC2, do the below:
+
+vi tomcat.sh
+
+## start of code
+sudo apt install tomcat9 tomcat9-admin -y
+sudo systemctl enable tomcat9
+
+# In the tomcat config file, replace port no 8080 with 9999 
+sudo sed -i 's/8080/9999/g' /etc/tomcat9/server.xml
+
+#Now restart the system for the changes to take effect
+sudo service tomcat9 restart
+## end of code
+
+# execute the script
+chmod +x tomcat.sh
+./tomcat.sh
+
+# check tomcat status
+sudo service tomcat9 status
+# It should be in running state.
+
+
+Task 7: Additional Setup for Jenkinsfile
+========================
+# Do the below in your server which runs Jenkins
+
+# add below line in /etc/sudoers. This will allow you to copy the war file to tomcat 
+# webroot directory
+sudo vi /etc/sudoers
+# add the line at the end.
+jenkins ALL = NOPASSWD: /usr/bin/cp
+
+# save & quit
+:wq!
+
+
+# Now, Install Maven in EC2
+sudo apt install maven -y
+mvn --version
+
+
+Task 8:View the resulting web page
+========================
+Now you can build your demo-pipeline project by clicking on Build Now.
+
+Once the loadbuild is successful, to access the tomcat server page, go to your browser 
+and enter Jenkins Server Public IP address followed 
+# (URL:  http://< Your Jenkins Public IP >:9999/welcome-page-war-1.0/)
+http://35.173.247.39:9999/welcome-page-war-1.0/
+
+# You will see a simple html page which says "Welcome! We are learning DevOps!!"
+
+
+Task 9:Configure Git WebHook in Jenkins
+=======================================
+# In next step, we will configure an automatic webhook from Github to jenkins. 
+# This will ensure that any change in code will immediately trigger a loadbuild. 
+
+Go to Jenkins webpage. Manage Jenkins > Manage Plugins
+
+Go to Available Tab, Search for GitHub Integration. Click on the GitHub Integration Plugin 
+and then on Install without restart
+
+Once the installation is completed, click on Go back to the top page
+
+In your demo-pipeline project, Click on Configure. Go to General > Build Triggers and enable 
+GitHub hook trigger for GITScm polling. Then Save
+
+Go to your GitHub website, and inside YT-jenkins repository under Settings Tab, 
+then Webhooks. Click on the Add webhook
+
+Fill the details as below.
+Payload URL : http://<<jenkins-publicIP>>/github-webhook/
+         Ex : http://35.173.247.39:8080/github-webhook/
+Content type: application/json
+Leave other fields with default values.
+Click 'Add webhook'
+
+
+Task 10:View the resulting web page
+========================
+Now you can build your demo-pipeline project by clicking on Build Now.
+
+Once the loadbuild is successful, to access the tomcat server page, go to your browser 
+and enter Jenkins Server Public IP address followed 
+# (URL:  http://< Your Jenkins Public IP >:9999/welcome-page-war-1.0/)
+http://35.173.247.39:9999/welcome-page-war-1.0/
+
+# You will see a simple html page which says "Welcome! We are learning DevOps!!"
+
+
+Task 11: Clean Up
+================
+# Terminate the EC2; You may also delete any security group you created.
+
+# In case if you are continuing to use Jenkins, it is better to remove the tomcat server.
+# Else it may slow down Jenkins
+sudo service tomcat9 stop
+sudo apt remove tomcat9
+
+
+
+#########
+The End
+#########
