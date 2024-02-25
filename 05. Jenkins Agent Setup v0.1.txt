@@ -1,0 +1,291 @@
+######################
+Jenkins Agent Setup 
+######################
+
+# Use us-east-1 (N Virginia) region. 
+# Launch Ubuntu 22.04 t2.micro EC2 machine. 
+# Note: In the security group, open ports 22 and 8080. 
+# Use the EC2 tag "Jenkins'
+
+
+Task 1: Initial Setup and Jenkins Installation
+====================================
+# After the EC2 server is up & running, SSH into the machine and do the below:
+
+sudo apt update -y
+sudo hostnamectl set-hostname Jenkins
+
+# create a small script which will install Jenkins
+vi MyJenkins.sh
+
+# Type the below code into MyJenkins.sh
+
+## start of code #####
+
+#sudo apt install default-jre -y
+sudo apt install fontconfig openjdk-17-jre -y
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+
+sudo systemctl start jenkins.service
+sudo systemctl status jenkins
+
+echo "InitialAdminPassword"
+echo "-------------------"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+## end of code ####
+
+#Save & quit
+
+
+# Provide execute permission
+chmod +x MyJenkins.sh
+
+# execute the shell script to launch Jenkins
+./MyJenkins.sh
+
+# Type 'Q' to get back prompt
+
+# Exit & SSH into the machine again. New hostname will appear now
+
+jenkins --version
+
+# Use below command to find ip address of the Jenkins server
+curl ifconfig.me
+
+# Check if Jenkins landing page is appearing: 
+http://52.23.181.249:8080/ # Use your respective ip address
+
+
+# Task 2: Configure Jenkins
+===========================
+# Get the initial password for Jenkins from the corresponding folder in Jenkins server.
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# copy the password. 
+ex: 712493233e784b07a577b099d4fc95a7
+
+# Now, go to the browser and enter Jenkins URL
+http://52.23.181.249:8080/
+
+# Under Unlock Jenkins, enter the above Initial password. Continue.
+Click on Install suggested Plugins on Customize Jenkins page.
+
+# Once the plugins are installed, it gives you the page where you can create new admin user id 
+# and password. 
+
+Enter user id and password. Save & Continue. 
+# To keep things easier for this training, you may use the same user
+# id and password which you used for Github. Needless to say, in real life, you must keep the user 
+# ids and passwords separate.
+
+In next step, on Instance Configuration Page, verify your Jenkins Public IP and Port Number then 
+click on Save and Finish
+
+
+Task 3: Configure Github WebHook in Jenkins (This is optional task)
+======================================
+Go to Jenkins webpage. Manage Jenkins > Manage Plugins
+
+Go to Available Tab, Search for GitHub Integration. Click on the GitHub Integration Plugin 
+and then on Install without restart
+
+Once the installation is completed, click on Go back to the top page
+
+In your hello-world project, Click on Configure. Go to Build Triggers and enable GitHub hook 
+trigger for GITScm polling. Then Save
+
+Go to your GitHub website, and inside hello-world repository under Settings Tab, then Webhooks. 
+Click on the Add webhook
+
+Fill the details as below.
+Payload URL : http://<<jenkins-publicIP>>/github-webhook/
+         Ex : http://34.202.157.230:8080/github-webhook/
+Content type: application/json
+Leave other fields with default values.
+Click Add webhook
+
+
+
+Task 4: Add Docker Machine as Jenkins Slave, which can do loadbuild
+==================================================
+Launch EC2; 
+Ubuntu; t2.medium; name: Docker
+
+
+Task 5: Setup Docker in the new EC2
+===================================
+
+# Exit from Jenkins EC2 temporarily.
+
+# Copy the keyfile (.pem file) from desktop to id_rsa of Jenkins EC2
+scp -i <keyname to access the Jenkins EC2> <keyname to be copied> ubuntu@ec2-44-206-232-30.compute-1.amazonaws.com:~/.ssh/
+scp -i "unus-kb2-keypair.pem" unus-kb2-keypair.pem ubuntu@ec2-34-203-202-48.compute-1.amazonaws.com:~/.ssh/id_rsa
+
+
+# login to Jenkins EC2 again
+# change the permissions of public key
+chmod 400 .ssh/id_rsa
+
+# Now setup docker-slave agent.
+
+# Login to the new EC2 from Jenkins EC2. Goto the console. Change the tag name of the EC2 to docker-slave
+# note the ip address of the EC2. SSH into the new EC2 from Jenkins EC2
+
+ssh 54.89.213.234
+sudo hostnamectl set-hostname docker-slave
+
+sudo apt-get update -y
+
+# Install java before installing docker
+sudo apt install fontconfig openjdk-17-jre -y
+
+java --version
+
+# Install docker
+sudo apt-get install docker.io -y
+docker --version
+
+
+# Perform the below steps to create a Dockerfile in /home/ubuntu directory.
+
+cd ~
+vi Dockerfile
+
+# enter the below:
+
+# Pull Base Image
+FROM tomcat:9-jre9
+
+# Copy the war file image to tomcat webroot path
+ADD target/welcome-page-war-1.0.war /usr/local/tomcat/webapps/
+
+# Install Maven in Docker machine 
+sudo apt install maven -y
+
+
+Task 6: Setup credential for Docker slave machine
+=================================================
+
+Go to Jenkins' home page and click on the Manage Jenkins option on the left. 
+Click on 'Credentials'. Click on 'Global'
+Click 'Add Credentials'
+Kind: SSH username with private key
+ID & Description: docker-login
+
+give username 
+'ubuntu', select Enter directly proceed to a private key value below. Click on the Add button 
+once it is done.
+
+You can get the private key as below: Goto your Jenkins EC2 machine.  
+cat ~/.ssh/id_rsa
+
+Copy the entire content including first line and last line. Paste it into the space provided for 
+private key
+
+
+
+
+Task 7: Setup new slave node for Jenkins
+========================================
+
+Go to Jenkins' home page and click on the Manage Jenkins option on the left. 
+Click on Nodes
+
+Click on the option New Node in the next window. Give the node name as 'docker-slave' and then 
+click on the 'ok' button. Select 'permanent agent'
+
+Fill out the details for the node 'docker-slave' as given below. The name should be given as 
+'docker-slave', Remote Root Directory as '/home/ubuntu/', labels to be 'docker-slave', usage to 
+be given as 'use this node as much as possible' and launch method to be set as 'Launch agents 
+via SSH'. In the host section, give the public IP of the Docker instance.
+
+Use the credential which we created in the previous step. 
+
+Save. Under the Nodes list it should show your new node. Hover over the node name and click on Log.
+ensure that it says 'Agent successfully connected and online'.
+
+For Host Key Verification Strategy select 'Non Verifying Verification strategy'. 
+
+
+Task 8: Create a Pipeline project
+========================
+Click 'New Item'
+BuildOnNewNode
+select pipeline. click Ok
+
+Under configure:
+Select pipeline
+
+# Copy the below code under script
+
+pipeline {
+    agent {
+        label 'docker-slave'
+    }
+
+    stages {
+        stage('Clone from GitHub') {
+            steps {
+                echo 'Clone stage'
+                git 'https://github.com/<your GitHub acnt>/YT-Jenkins.git' // Note - use your GitHub repo
+            }
+        }
+        
+        stage('Build Stage') {
+            steps {
+                echo 'Build Stage'
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Deploy Stage') {
+            steps {
+                echo 'Deploy Stage'
+                sh 'sudo docker container rm -f NewNode-container'
+                sh 'sudo docker build -t NewNode-image -f /home/ubuntu/Dockerfile .'
+                sh 'sudo docker run -d -p 8080:8080 --name NewNode-container NewNode-image'
+            }
+        }
+
+    }
+}
+
+Now click on 'Build Now'
+
+Observe the successful load build.
+
+# Note: you can clone repo from GitHub account - https://github.com/unuste37/YT-Jenkins.git
+
+
+Task 9 : Build the load, verify the web page
+============================================
+Now you can build your BuildOnNewNode project by clicking on Build Now or by making a small change in
+Github files. 
+
+Once the loadbuild is successful, to access the tomcat server page, you can use below:
+
+# Use http://<Your Docker Host Public IP >:8080/hello-world-war-1.0.0/ in your browser to see the website
+http://<docker ip address>:8080/welcome-page-war-1.0/
+http://54.87.130.237:8080/welcome-page-war-1.0/
+
+
+Task 10: Clean up the Instances
+=======================
+Go to EC2 dashboard, stop both the EC2 instances in which Jenkins is running. 
+
+
+
+###########################
+E N D 
+###########################
+
+
