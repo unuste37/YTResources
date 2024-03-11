@@ -1,0 +1,322 @@
+
+######################
+Lab  : Deploy WordPress on Amazon Linux 2 using CodeDeploy
+######################
+
+Task 1: Launch EC2
+===========
+1. Create an IAM role 'EC2RoleforCodeDeploy' for The EC2 instance so that CodeDeploy-agent can run on it.
+   Add policy 'AmazonEC2RoleforAWSCodeDeploy' to that role.
+2. Launch an amazon linux2 EC2 with port numebrs 22 and 80 open. Use the above instance profile 
+   (EC2RoleforCodeDeploy).  Tag name=WordPress. This is the EC2 onto which we will deploy the code. 
+
+
+Task 2: Download Source Content
+================
+1. Open cloudshell
+
+2. Download the wordpress package
+   wget https://github.com/WordPress/WordPress/archive/master.zip
+  
+3. Unzip the package
+   unzip master -d /tmp/WordPress_Temp
+
+4. Create a folder '/tmp/WordPress' and move the contents to new folder
+   mkdir -p /tmp/WordPress
+   cp -paf /tmp/WordPress_Temp/WordPress-master/* /tmp/WordPress
+
+5. Remove the contents from WordPress_temp.
+   rm -rf /tmp/WordPress_Temp
+   rm -f master.zip
+
+   Now, you have a clean set of WordPress source code files in the /tmp/WordPress folder.
+
+
+
+Task 3: Configure Source Content
+===========
+
+1. Create a folder and scripts in the directory. CodeDeploy uses these scripts to set up and deploy 
+   your application revision on the target Amazon EC2 instance. First, create a scripts directory in 
+   your copy of the WordPress source code:
+
+   mkdir -p /tmp/WordPress/scripts
+   ls /tmp/WordPress
+
+2. Create an install_dependencies.sh file in /tmp/WordPress/scripts. Add the following lines to the file. 
+   This install_dependencies.sh script installs Apache, MySQL, and PHP. It also adds MySQL support to PHP.
+
+   vi /tmp/WordPress/scripts/install_dependencies.sh 
+
+   Copy below code into it
+   
+#!/bin/bash
+sudo amazon-linux-extras install php7.4
+sudo yum install -y httpd mariadb-server php
+
+#sudo yum install php - y
+#sudo yum clean metadata
+
+3. Create a start_server.sh file. This script starts Apache and MySQL.
+   vi /tmp/WordPress/scripts/start_server.sh
+
+#!/bin/bash
+systemctl start mariadb.service
+systemctl start httpd.service
+systemctl start php-fpm.service
+
+
+4. Create a stop_server.sh file. This script stops Apache and MySQL.
+   vi /tmp/WordPress/scripts/stop_server.sh
+
+#!/bin/bash
+isExistApp=pgrep httpd
+if [[ -n $isExistApp ]]; then
+systemctl stop httpd.service
+fi
+isExistApp=pgrep mysqld
+if [[ -n $isExistApp ]]; then
+systemctl stop mariadb.service
+fi
+isExistApp=pgrep php-fpm
+if [[ -n $isExistApp ]]; then
+systemctl stop php-fpm.service
+
+fi
+
+
+5. Create a create_test_db.sh file. This script uses MySQL to create a test database for WordPress to use.
+   vi /tmp/WordPress/scripts/create_test_db.sh
+
+#!/bin/bash
+mysql -uroot <<CREATE_TEST_DB
+CREATE DATABASE IF NOT EXISTS test;
+CREATE_TEST_DB
+
+
+6. Create a change_permissions.sh script. This is used to change the folder permissions in Apache.
+  vi /tmp/WordPress/scripts/change_permissions.sh
+
+#!/bin/bash
+chmod -R 777 /var/www/html/WordPress
+
+
+7. Give executable permissions to all scripts
+chmod +x /tmp/WordPress/scripts/*
+ll -rt /tmp/WordPress/scripts/*
+
+
+8. Now, add an AppSpec file. This does the following 1) Map the source files in your application 
+   revision to their destinations on the target Amazon EC2 instance.   2) Specify custom permissions for 
+   deployed files.   3) Specify scripts to be run on the target Amazon EC2 instance during the deployment.
+   Name must be appspec.yml and it should reside in rootdir. 
+
+nano /tmp/WordPress/appspec.yml
+
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /var/www/html/WordPress
+hooks:
+  BeforeInstall:
+    - location: scripts/install_dependencies.sh
+      timeout: 300
+      runas: root
+  AfterInstall:
+    - location: scripts/change_permissions.sh
+      timeout: 300
+      runas: root
+  ApplicationStart:
+    - location: scripts/start_server.sh
+    - location: scripts/create_test_db.sh
+      timeout: 300
+      runas: root
+  ApplicationStop:
+    - location: scripts/stop_server.sh
+      timeout: 300
+      runas: root
+
+
+
+Task 4: Upload your wordpress application to S3
+==============
+
+1. Create an S3 bucket from Cloudshell. Issue below command. 
+   Note: replace 'yourname' with your actual name or any andom no.   
+   aws s3 mb s3://codedeploydemobucket-yourname --region us-east-1
+
+2. Prepare the application files to be uploaded. It should have below structure 
+/tmp/
+  |--WordPress/
+      |-- appspec.yml  
+      |-- scripts/
+      |    |-- change_permissions.sh
+      |    |-- create_test_db.sh
+      |    |-- install_dependencies.sh
+      |    |-- start_server.sh
+      |    |-- stop_server.sh
+      |-- wp-admin/
+      |    |-- (various files...)
+      |-- wp-content/
+      |    |-- (various files...)
+      |-- wp-includes/
+      |    |-- (various files...)
+      |-- index.php
+      |-- license.txt
+      |-- readme.html
+      |-- (various files ending with .php...)
+
+
+
+3. Call the create-application command to register a new application named WordPress_App:
+
+cd /tmp/WordPress
+aws deploy create-application --application-name WordPress_App
+
+# You will get below response. 
+{
+    "applicationId": "56a20284-2e66-4dee-8c76-e8be0a3b7e5f"
+}
+
+4. Call the CodeDeploy push command to bundle the files together, upload the revisions to Amazon S3, and 
+   register information with CodeDeploy about the uploaded revision, all in one action.
+
+aws s3 rm s3://codedeploydemobucket-yourname/WordPressApp.zip # delete if already exists.
+
+aws deploy push \
+  --application-name WordPress_App \
+  --s3-location s3://codedeploydemobucket-yourname/WordPressApp.zip \
+  --ignore-hidden-files
+
+or
+aws deploy create-application --application-name WordPress_App --region us-east-1
+
+5. List the files in the bucket. WordPressApp.zip should be present.
+aws s3 ls s3://codedeploydemobucket-yourname
+
+
+
+Task 5: Create a service role for CodeDeploy, Install CodeDeploy-Agent in EC2
+============================
+
+1. Create a service role for Code Deploy so that CodeDeploy can call other AWS services on your behalf.
+role name: CodeDeployServiceRole
+
+2. Now attach the policy AWSCodeDeployRole (arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole) to the role.
+   This policy is used when your deployment target is an EC2. 
+aws iam attach-role-policy --role-name CodeDeployServiceRole --policy-arn arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole 
+
+# Note the ARN of the role:
+arn:aws:iam::<account no>:role/CodeDeployServiceRole
+
+3. Install CodeDeploy Agent in your target EC2
+SSH into your EC2. Type below commands. 
+
+sudo yum update -y
+
+sudo yum install ruby -y
+wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
+chmod +x ./install
+sudo ./install auto
+
+sudo systemctl status codedeploy-agent
+sudo systemctl start codedeploy-agent (if needed)
+
+
+Alternative Method to install codedeploy-agent:
+aws ssm create-association \
+  --name AWS-ConfigureAWSPackage \
+  --targets Key=tag:Name,Values=WordPress \
+  --parameters action=Install,name=AWSCodeDeployAgent \
+  --schedule-expression "cron(0 2 ? * SUN *)" 
+
+
+Task 6: Create Deployment group, deployments
+============================
+
+1. Call the create-deployment-group command to create a deployment group named WordPress_DepGroup, associated with the 
+   application named WordPress_App, using the Amazon EC2 tag named WordPress and deployment configuration named       CodeDeployDefault.OneAtATime:
+
+aws deploy create-deployment-group \
+  --application-name WordPress_App \
+  --deployment-group-name WordPress_DepGroup \
+  --deployment-config-name CodeDeployDefault.OneAtATime \
+  --ec2-tag-filters Key=Name,Value=WordPress,Type=KEY_AND_VALUE \
+  --service-role-arn arn:aws:iam::4616xxxxxxxx:role/CodeDeployServiceRole
+
+# CodeDeployServiceRole: arn:aws:iam::4616xxxxxxxx:role/CodeDeployServiceRole
+
+
+2. Now call the create deploy command from cloudshell
+aws deploy create-deployment \
+  --application-name WordPress_App \
+  --deployment-config-name CodeDeployDefault.OneAtATime \
+  --deployment-group-name WordPress_DepGroup \
+  --s3-location bucket=codedeploydemobucket-yourname,bundleType=zip,key=WordPressApp.zip
+
+
+3. list deployments
+aws deploy list-deployments --application-name WordPress_App --deployment-group-name WordPress_DepGroup --query 'deployments' --output text
+
+
+Task 7: Setup WordPress site
+============================
+1. copy the public DNS of your EC2 and paste in browser address bar
+ex: http://ec2-34-239-115-14.compute-1.amazonaws.com/WordPress
+
+Click on 'Let's go!.'
+
+2. Setup WordPress. Enter the below in the form. 
+   Database Name: test;  User Name: root; Password: Leave blank.
+   Database Host: localhost; Table Prefix: wp_
+
+   Choose Submit to set up the database.
+   Run the installation
+
+3. On the Welcome page, fill in any values you want, and choose Install WordPress. When the installation is complete, 
+   you can sign in to your dashboard.
+
+
+
+Task 8: Update and Redeploy your application
+============================
+1. Open /WordPress folder from cloudshell. Modify sites colors. 
+cd /tmp/WordPress
+
+vi /tmp/WordPress/wp-admin/about.php
+# Make some changes to the web page text. Ex: change 'WordPress x.x' to 'I love WordPress'
+
+
+2. Zip and Push revised code to S3 bucket
+aws deploy push \
+  --application-name WordPress_App \
+  --s3-location s3://codedeploydemobucket-yourname/WordPressApp.zip \
+  --ignore-hidden-files
+
+  The above command bundles the files from the current directory (excluding any hidden files) into a single archive 
+  file named WordPressApp.zip, uploads the revision to the codedeploydemobucket-yourname bucket, and registers
+  information with CodeDeploy about the uploaded revision.
+
+3. Call the create-deployment command to create a deployment based on the newly uploaded revision. 
+
+aws deploy create-deployment --application-name WordPress_App --deployment-config-name CodeDeployDefault.OneAtATime --deployment-group-name WordPress_DepGroup --s3-location bucket=codedeploydemobucket-yourname,bundleType=zip,key=WordPressApp.zip
+
+4. Access the wordpress page and verify the change in page. 
+http://ec2-34-239-115-14.compute-1.amazonaws.com/WordPress
+
+
+Task 9: CleanUp
+===============
+After you are done with the lab, you may delete the EC2 and the application in CodeDeploy. 
+
+
+###########################################
+               E    N    D
+###########################################
+
+
+
+
+
+
