@@ -1,0 +1,138 @@
+
+######################
+Lab  : CodePipeline Triggered by git tag
+######################
+
+
+Task 1: Clone your repo
+===========
+1. Open cloudshell
+2. Clone repo
+git clone https://github.com/<git user id>/YT-hello-world.git
+
+# Note: you may fork the below repo and use it for this hands-on:
+git clone https://github.com/unuste37/YT-hello-world.git
+
+
+Task 2: Create Pipeline
+===========
+ 1. Create new pipeline MyGitHubTagsPipeline
+ 2. Pipeline type v2; service role: new service role
+ 3. choose next
+ 4. Source: choose Github (Version 2)
+ 5. Under Connection, choose an existing connection or create a new one. 
+ 6. In Repository name, choose the name of your GitHub repository. (ex: unuste37/YT-hello-world)
+ 7. Filter type: Tags. In the Include field, enter release*
+ 8. Click Next
+ 9. In Build provider, choose AWS CodeBuild. 
+10. Create Project
+11. Enter project name, ex: gittag-proj
+12. In Environment image, choose Managed image. For Operating system, choose Ubuntu.
+13. For Runtime, choose Standard. For Image, choose aws/codebuild/standard:7.0.
+14. For Service role, choose New service role. Note the name of your CodeBuild service role.
+    ex: codebuild-gittag-proj-service-role
+15. Under Buildspec, for Build specifications, choose Insert build commands. Choose Switch to
+    editor, and paste the following under Build commands.
+
+version: 0.2
+#env:
+  #variables:
+     # key: "value"
+     # key: "value"
+  #parameter-store:
+     # key: "value"
+     # key: "value"
+  #git-credential-helper: yes
+phases:
+  install:
+    #If you use the Ubuntu standard image 2.0 or later, you must specify runtime-versions.
+    #If you specify runtime-versions and use an image other than Ubuntu standard image 2.0, the build fails.
+    runtime-versions:
+      nodejs: 18
+    #commands:
+      # - command
+      # - command
+  #pre_build:
+    #commands:
+      # - command
+      # - command
+  build:
+    commands:
+      - 
+  #post_build:
+    #commands:
+      # - command
+      # - command
+artifacts:
+  files:
+     - '*'
+    # - location
+  name: $(date +%Y-%m-%d)
+  #discard-paths: yes
+  #base-directory: location
+#cache:
+  #paths:
+    # - paths
+
+
+16. Choose Continue to CodePipeline. This returns to the CodePipeline console and creates a  
+       CodeBuild project that uses your build commands for configuration. The build project uses a 
+       service role to manage AWS service permissions. This step might take a couple of minutes.
+17. Choose Next.
+18. Choose Skip deploy stage; Choose Next.
+19. Review & Create pipeline.
+
+
+Task 3: Create Tag
+===============
+ 1. In Cloudshell, 
+    cd <git repo> ex: cd YT-hello-world
+
+ 2. make your changes
+    vi hello.txt ; then edit
+    git add .
+    git config --global user.email "you@example.com"
+    git config --global user.name "Your Name"
+
+    git commit -m 'new changes'
+
+ 3. Display the commit details
+    git log
+    # note commit id of your required commit. ex:8685de0728e3448cac4bdd44c567af0dafc99202 
+
+ 4. In the CloudShell terminal, enter the command to tag your commit and push it to origin. 
+    git tag release-4 874a91f55980405ee0305fe3261a625fefac982f
+
+ 5. Create github token if not alreay done.  Goto Github homepage. click menu on ight side top.
+    click on 'Settings'
+    'Developer Settings' -> 'Personl Access Tokens' -> 'Tokens' (Classic)
+    'generate New Tokens' (classic). Under Notes enter 'practice'. Expiration 7 days
+    Scope - select everything
+    Click 'Generate Token'. Copy it. ex: ghp_xyzmmm3v2wvSJhVB7aiAeNoKSb2mL0cV
+    Use the above PAT as password to access github in next step. 
+
+ 6. After you tag your commit, you use the git push command to push the tag to origin. In the 
+    following example, enter the following command to use the release-1 tag for the second 
+    commit with ID xxxxx. This tag will be filtered by the pipeline release* tag filter 
+    and will start the pipeline.
+
+    git push origin release-2
+
+
+Task 4: Observe CodePipeline
+================
+ 1. After the git commit id with the tag is pushed to github, goto codepipeline console
+     and observe that the pipeline is triggered.
+ 2. For cleanup, remove the codepipeline, codebuild project. You may also delete the IAM 
+     roles created
+
+
+###########################################
+               E    N    D
+###########################################
+
+
+
+
+
+
