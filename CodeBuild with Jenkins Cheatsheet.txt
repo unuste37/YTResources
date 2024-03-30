@@ -1,0 +1,254 @@
+
+##########################################
+# Title : Setup AWS CodeBuild with Jenkins
+# https://docs.aws.amazon.com/codebuild/latest/userguide/jenkins-plugin.html
+###########################################
+
+Task 1: Launch an EC2
+===================
+# You may use the below specs. 
+# region used: us-east-1 (N Virginia) region. 
+# Launch Ubuntu 22.04 LTS t2.medium EC2 machine. 
+# Note: In the security group, open ports 22 and 8080. 
+# Use the EC2 Name tag "Jenkins'; Use a key pair
+
+
+Task 2: Jenkins Installation
+======================
+# After the EC2 server is up & running, SSH into the machine and do the below:
+
+sudo apt update -y
+sudo hostnamectl set-hostname Jenkins
+
+# create a small script which will install Jenkins
+vi MyJenkins.sh
+
+# Type the below code into MyJenkins.sh
+
+## start of code #####
+
+sudo apt install default-jre -y
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+
+sudo systemctl start jenkins.service
+sudo systemctl status jenkins
+
+echo "InitialAdminPassword"
+echo "-------------------"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+## end of code ####
+
+#Save & quit
+
+
+# Provide execute permission
+chmod +x MyJenkins.sh
+
+# execute the shell script to launch Jenkins
+./MyJenkins.sh
+
+# Type 'Q' to get back prompt
+
+# Exit & SSH into the machine again. New hostname will appear now
+
+# Use below command to find ip address of the Jenkins server
+curl ifconfig.me
+
+# Check if Jenkins landing page is appearing: 
+http://3.94.185.28:8080/ # Use your respective ip address
+
+
+
+Task 3: Configure Jenkins
+======================
+# Get the initial password for Jenkins from the corresponding folder in Jenkins server.
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# copy the password. 
+ex: e1be298ed42c4c839829ba416a1293b1
+
+# Now, go to the browser and enter Jenkins URL. Ex:
+http://3.94.185.28:8080/
+
+# Under Unlock Jenkins, enter the above Initial password. Continue.
+Click on Install suggested Plugins on Customize Jenkins page.
+
+# Once the plugins are installed, it gives you the page where you can create new admin 
+# user id and password. 
+
+Enter user id and password. Save & Continue. 
+# To keep things simple, choose a simple user id and password. For ex: admin; admin
+# Needless to say, in real life, you must keep the user ids and passwords separate.
+
+In next step, on Instance Configuration Page, verify your Jenkins Public IP and Port 
+Number then click on Save and Finish
+
+Start Using Jenkins
+
+
+
+Task 4: Setup GitHub repository
+==========================
+
+Create your Github account
+Fork the following repository and create your own repository 'jenkins-proj'.
+Repository: https://github.com/unuste37/YT-hello-world.git
+
+
+
+Task 5: Setup CodeBuild Project
+========================
+01. Create a project in the CodeBuild console. Name: jenkins-proj 
+    Write down the name of your project. We need this for other steps.
+
+02. Use github repo as your source repo
+    https://github.com/unuste37/YT-hello-world.git
+    Connect using oAuth
+
+03. Filter group 1 - Event type - PUSH
+    Buildspec - Use Buildspec file; 
+    Under 'Primary source webhook events', Select 'Rebuild every time a code change 
+    is pushed to this repository'
+
+
+Task 6: Setup IAM User and Permissions for Jenkins
+==========================
+01. Create an IAM policy (jenkins-policy) using below JSON doc. 
+    Replace {{region}} with region name and {{awsAccountId}} with your account id
+    and replace {{projectName}} with the project name which you just created. 
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Resource": ["arn:aws:logs:{{region}}:{{awsAccountId}}:log-group:/aws/codebuild/{{projectName}}:*"],
+      "Action": ["logs:GetLogEvents"]
+    },
+    {
+      "Effect": "Allow",
+      "Resource": ["arn:aws:s3:::{{inputBucket}}"],
+      "Action": ["s3:GetBucketVersioning"]
+    },
+    {
+      "Effect": "Allow",
+      "Resource": ["arn:aws:s3:::{{inputBucket}}/{{inputObject}}"],
+      "Action": ["s3:PutObject"]
+    },
+    {
+      "Effect": "Allow",
+      "Resource": ["arn:aws:s3:::{{outputBucket}}/*"],
+      "Action": ["s3:GetObject"]
+    },
+    {
+      "Effect": "Allow",
+      "Resource": ["arn:aws:codebuild:{{region}}:{{awsAccountId}}:project/{{projectName}}"],
+      "Action": ["codebuild:StartBuild",
+        "codebuild:BatchGetBuilds",
+        "codebuild:BatchGetProjects"]
+    }
+  ]
+}
+
+
+An example policy is given below:
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:logs:us-east-1:461xxxxxx973:log-group:/aws/codebuild/jenkins-proj:*"
+            ],
+            "Action": [
+                "logs:GetLogEvents"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::{{inputBucket}}"
+            ],
+            "Action": [
+                "s3:GetBucketVersioning"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::{{inputBucket}}/{{inputObject}}"
+            ],
+            "Action": [
+                "s3:PutObject"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::{{outputBucket}}/*"
+            ],
+            "Action": [
+                "s3:GetObject"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:codebuild:us-east-1:461xxxxxx973:project/jenkins-proj"
+            ],
+            "Action": [
+                "codebuild:StartBuild",
+                "codebuild:BatchGetBuilds",
+                "codebuild:BatchGetProjects"
+            ]
+        }
+    ]
+}
+
+
+02. Create a new IAM user to be used by the Jenkins plugin. Name: JenkinsUser
+    Attach the policy created above. 
+
+03. Create credentials for the user, choose Programmatic Access. 
+    Select the user. Click on security credentials. Create access key. select
+    local code
+
+AKIAWW6ZMI3SxxxETODO
+/nklMjTpJWD05BxxxRqYxxxMUaDO5UbKSEHY8JWa
+
+
+Task 7: Configure Jenkins Project
+================
+01. Install Codebuild plugin
+    Manage jenkins > Plugins > AWS Codebuild > Install 
+
+02. Create a freestyle project in Jenkins. Name: jenkins-proj (any name is ok)  
+
+03. On the Configure page, choose Add build steps, and then choose 'AWS CodeBuild'.
+    Select 'Manually specify access and sect keys'. Enter access key and secret key.
+    Enter region. Enter project name created in codebuild.
+
+04. Select 'use project source'. Click 'Save'.
+
+05. Click on 'Build Now' 
+
+
+Task 7: Clean Up
+================
+# Terminate the EC2; You may also delete any security group you created.
+# Delete the codebuild project
+# Delete the IAM policy and IAM user you created
+
+
+#########
+The End
+#########
