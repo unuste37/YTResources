@@ -1,0 +1,80 @@
+
+
+##########################################
+# Title : Migrate Github Repository to CodeCommit 
+# https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-migrate-repository-existing.html
+###########################################
+
+Task 1: Set up CodeCommit Access for your user id
+==========================
+1. Go to IAM, choose the IAM user name to which you need to give CodeCommit user access
+ 
+2. On the Permissions tab, choose Add Permissions.  In Grant permissions, choose Attach existing 
+   policies directly.
+
+3. From the list of policies, select 'AWSCodeCommitPowerUser' or another managed policy for CodeCommit 
+   access. For more information, see AWS managed policies for CodeCommit.
+
+4. After you have selected the policy you want to attach, choose Next: Review to review the list of 
+   policies to attach to the IAM user. If the list is correct, choose Add permissions.
+
+
+Task 2: Set up CodeCommit Credential
+==========================
+https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html
+
+1. In the IAM console, in the navigation pane, choose Users, and from the list of users, choose your 
+   IAM user.
+
+2. On the user details page, choose the Security Credentials tab, and in HTTPS Git credentials for 
+   AWS CodeCommit, choose Generate.
+
+3. Copy the user name and password by copying to notepad or by choosing Download credentials to 
+   download this information as a .CSV file. 
+ex:
+Unusxx-at-461xxxxxx973
+PqUFOsUs+c6defFsrfcKfNK3MPuueswKe4XsoLL5xG27+kYfgBQ2ICRdAM0=
+
+
+Task 3: Create CodeCommit Repository
+==========================
+1. Go to AWS CodeCommit
+
+2. Choose the AWS Region where you want to create the repository. 
+
+3. On the Repositories page, choose Create repository.
+
+4. Enter the Repository name, ex: my-new-repo.
+
+5. In Description, enter a description for the repository. 
+
+6. Create
+
+7. Choose the protocol (SSH or HTTPS) to be used to connect to CodeCommit. you can choose https URL.
+ex: 
+https://git-codecommit.us-east-1.amazonaws.com/v1/repos/my-new-repo
+
+
+Task 4: Clone Github repo into your local machine
+===============================
+1. Go to Cloudshell
+
+2. Clone the repo
+   git clone https://github.com/unuste37/YT-hello-world.git aws-codecommit-demo
+
+   cd aws-codecommit-demo
+
+
+Task 5: Push your code to CodeCommit
+==============================
+1. Run the git push command, specifying the URL and name of the destination CodeCommit repository 
+   and the --all option. 
+   ex: git push https://git-codecommit.us-east-1.amazonaws.com/v1/repos/my-new-repo --all
+
+2. You can delete the aws-codecommit-demo folder and its contents after you have migrated the 
+   repository to CodeCommit. 
+
+3. View the files in CodeCommit. Check the commits. 
+
+
+
