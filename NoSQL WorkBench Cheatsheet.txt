@@ -1,0 +1,73 @@
+
+NoSQL WorkBench for DynamoDB. 
+##############################
+
+YouTube Video Link: https://youtu.be/qpVpQOREcIQ
+
+Download WorkBench:  https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/workbench.settingup.install.html
+
+
+Task 1: Set up NoSQL WorkBench
+==========================
+
+01. Open NoSQL Workbench
+
+02. Open Data Modeller
+
+03. Under data Model, click on '+' symbol and add a data model.
+    Make Model from scratch
+    Name: country-model
+    Author: Your name
+    Click 'Create'
+
+04. Click on Operation Builder. 
+    Add Connection
+
+    Connection Name: DDB-connect
+    Region: your region ex: us-east-1
+    Enter AKID and Secret Access key
+    to get access key, go to IAM > Select the user id > Security Credentials > Access Keys > Create Access key
+
+05. Select the connection name and click Open
+
+06. Goto visualiser. Create New Table. Table name: countries6
+
+07. Partition Key : continent (string); 
+   Select 'Add Sort Key' Sort key : Country (string)
+ 
+08. Click on Visualise data model
+   Aggregate view. Check the table design 
+   Commit to Amazon DynamoDB
+   Select the connection Name. Commit
+
+09. Go to DynamoDB console and ensure that the table is added
+
+10. Add a few more attributes, Go to Data Model. Select table. Edit
+
+11. Click on Add other attribute.
+    Attribute name: GDP - Number
+    Attribute name: Language - String
+    Attribute name: Population - Number
+
+    Click 'Save Edits'
+
+
+Task 2: Add items in table
+======================
+01. Go to Operation Builder
+02. Select PARTIQL operations; Expand Operation
+03. Under statement copy the below
+
+INSERT INTO countries VALUE {'continent' : 'Europe', 'country': 'Turkey', 'GDP': 1.2, 'Language': 'Turkish', 'Population': 23}
+INSERT INTO countries VALUE {'continent' : 'Asia', 'country': 'India', 'GDP': 7.3, 'Language': 'Hindi', 'Population': 1400}
+
+
+04. Click 'Run'
+
+05. query the data already present. Ex:
+SELECT * FROM "countries" WHERE "continent" = 'Europe'
+
+Task 3: Clean Up
+=============
+Delete the DynamoDB table. Close the workbench.
+
