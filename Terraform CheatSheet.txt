@@ -1,0 +1,64 @@
+
+
+#####################
+Terraform Labs Steps
+#####################
+
+Task 1: Install Terraform
+=========================
+1. Login to AWS Console
+2. Open cloudshell
+3. Download terraform binary
+mkdir Terraform && cd Terraform
+
+wget https://releases.hashicorp.com/terraform/1.8.2/terraform_1.8.2_linux_amd64.zip
+unzip terraform_1.8.2_linux_amd64.zip
+# note - download the latest version. Version changes almost every other week.
+
+4. Move the binary to the path /usr/local/bin
+ls
+sudo mv terraform /usr/local/bin
+ls
+terraform
+terraform -v
+
+
+Task 2: Create an EC2 instance with Terraform
+=============================================
+cd ~/Terraform
+
+vi my-new-ec2.tf
+
+# Add the given lines, by pressing "INSERT" 
+
+provider "aws" {
+  profile = "default" 
+  region  = "us-east-1"
+}
+
+resource "aws_instance" "my-new-ec2" {
+  ami           = "ami-04b70fa74e45c3917"
+  instance_type = "t2.micro"
+  tags = {
+    Name = "Yourname-Terraform-EC2" # update your name in this line
+  }
+}
+
+
+# save the file using "ESCAPE + :wq!"
+
+terraform init
+terraform fmt
+terraform validate
+terraform plan
+terraform apply
+
+ls
+cat terraform.tfstate
+
+
+Task 3: Cleanup
+===============
+# Use the "terraform destroy" command for cleaning up the infrastructure used in this lab
+terraform destroy
+
