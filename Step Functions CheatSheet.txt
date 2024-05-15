@@ -1,0 +1,125 @@
+
+Step Functions Hands-On
+=====================
+
+######################
+Lab 1. Step Function to Select/Reject a student based on Maths/Physics cut-off mark
+######################
+
+Task 1: Create SNS topic
+======================
+1. Create an SNS topic. Subscribe your mail id to the topic. 
+
+
+Task 2: Definition of Step Function
+==============
+1. Goto Step Functions console. 
+    Create a State Machine. Use the below code. 
+   Name: course_selection_state_machine
+
+{
+  "Comment": "An example of the Amazon States Language for scheduling a task.",
+  "StartAt": "StartHere",
+
+  "States": {
+    "StartHere": {
+      "Type": "Pass",
+      "Next": "SubjectChoice"
+    },
+
+    "SubjectChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.Subject",
+          "StringEquals": "Physics",
+          "Next": "Physics"
+        },
+        {
+          "Variable": "$.Subject",
+          "StringEquals": "Maths",
+          "Next": "Maths"
+        }
+      ],
+      "Default": "Rejected"
+    },
+
+    "Physics": {
+      "Type": "Pass",
+      "Next": "CheckMarks"
+    },
+
+    "Maths": {
+      "Type": "Pass",
+      "Next": "CheckMarks"
+    },
+
+    "CheckMarks": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.Marks",
+          "NumericGreaterThan": 70,
+          "Next": "NotifySuccess"
+        }
+      ],
+      "Default": "Rejected"
+    },
+
+    "NotifySuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "_comment": "Use your SNS topic ARN"
+        "TopicArn": "arn:aws:sns:us-east-1:46xxxxxx73:notify-user",
+        "Message.$": "$.SuccessMessage"
+      },
+      "Next": "EndState"
+    },
+
+    "Rejected": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+       "_comment": "Use your SNS topic ARN"
+        "TopicArn": "arn:aws:sns:us-east-1:46xxxxxx73:notify-user",
+        "Message.$": "$.FailMessage"
+      },
+      "Next": "EndState"
+
+    },
+    "EndState": {
+      "Type": "Pass",
+      "End": true
+    }
+  }
+}
+
+
+
+2. Execute the state machine. Provide the below timer value as the input.
+Execution input:
+
+{
+  "Subject": "Maths",
+  "Marks": 76,
+  "SuccessMessage": "Hello - You are selected",
+  "FailMessage": "Hello - You did not meet the criteria. Try next time"
+}
+
+{
+  "Subject": "Physics",
+  "Marks": 91,
+  "Message": "Hello - You are Selected",
+  "FailMessage": "Hello - You did not meet the criteria. Try next time"
+}
+
+
+3. Observe the graph view. Observe each step turning green. Ensure you have got the email. 
+
+4. Cleanup - delete the step function
+ 
+
+#####
+End
+#####
