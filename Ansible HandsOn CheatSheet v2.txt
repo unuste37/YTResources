@@ -1,0 +1,221 @@
+Ansible Lab for Beginners
+#######################
+
+Lab
+====
+This cheatsheet will help in setting up ansible on your RHEL machine.
+This lab exercise includes Ansible control node (master) and 2 remote 
+hosts (slaves). 
+
+Ansible Lab Steps
+=================
+Login to AWS Console
+
+################################################
+Task 1: Installation and Configuration of Ansible
+################################################
+
+# Launch an RHEL 9 machine in us-east-1. Choose t2.micro. In security group, 
+# allow SSH (22) and HTTP (80) for all incoming traffic. Add Tag Name: Ansible-ControlNode
+
+# Once the EC2 is up & running, SSH into it and set the hostname as 'Control-Node'. 
+sudo hostnamectl set-hostname Control-Node
+# Now you can exit and login again. It will show the new hostname.
+# or you can type 'bash' and open another shell which shows new hostname.
+
+# Update the package repository with latest available versions
+sudo yum check-update
+
+# Install latest version of Python. 
+python3 --version # if it is not 3.9, then install:
+sudo yum install python3.9-pip -y
+# else, no action needed
+
+# Install awscli, boto, boto3 and ansible
+# Boto/Boto3 are AWS SDK which will be needed while accessing AWS APIs
+sudo pip3 install awscli boto boto3 ansible
+ansible --version
+
+# Now configure aws cli to provide the credentials of the IAM user.
+aws configure
+Enter AKID (Access Key)
+Enter SAK (Secret Key)
+
+
+# If you need to create new credentials, Follow below steps
+Go to aws console. On top right corner, click on your name or aws profile id. 
+when the menu opens, click on Security Credentials
+Under AWS IAM Credentials, click on Create access key. If you already have 2 active keys, 
+you can deactivate and delete the older one so that you can create a new key
+
+# Do the below smoke test to check if the configuration has worked. For the below commanbd, you should
+# get a list of your s3 buckets. If you don't have any buckets the command won't output anything.
+# You are ok, as long as it does not give any error.
+aws s3 ls
+Or
+aws sns list-topics
+
+# Install wget so that we can download playbooks from the training material repository 
+sudo yum install wget -y
+
+# find the EC2 ip address
+curl ifconfig.me
+54.208.161.28
+
+# Exit from the EC2
+
+# From downloads folder Copy the private key from your laptop to the ansible control node.
+scp -i <keypair name> <file to be copied> ec2-user@54.145.66.138:/home/ec2/.ssh/id_rsa
+scp -i unus-kp5-keypairs.pem unus-kp5-keypairs.pem ec2-user@54.208.161.28:~/.ssh/id_rsa
+
+# SSH back into EC2.
+chmod 400 ~/.ssh/id_rsa
+
+
+Task 2: Prepare or Download the playbook
+=========================================
+#This playbook creates 2 EC2s which we use as slaves.
+gather_facts: yes under hosts.
+
+vi ec2-playbook.yml
+
+###code starts from next line ###
+---
+- name: Launch an EC2 instance
+  hosts: localhost
+  tasks:
+    - name: start an instance with a public IP address
+      amazon.aws.ec2_instance:
+        name: "{{ item }}"
+        ## choose your region
+        region: "us-east-1"
+        ## Use same key you used for control node
+        key_name: "unus-kb2-keypair"
+        ## Use same subnet as control node
+        vpc_subnet_id: "subnet-0b2f88ba9ee77b130"
+        instance_type: t2.micro
+        ## sec grp should have port 22 and 80 open.
+        security_group: "sg-0abb640d5adf0df0d"
+        network:
+          assign_public_ip: true
+        image_id: "ami-0583d8c7a9c35822c"
+      register: ec2_created
+      with_items:
+          - host-1
+          - host-2
+    - name: Make ansible directory
+      file:
+        path: /etc/ansible
+        state: directory
+      become: yes
+    - debug:
+        msg: "{{ ec2_created.results[0].instances[0].private_ip_address }}"
+    - debug:
+        msg: "{{ ec2_created.results[1].instances[0].private_ip_address }}"
+
+###code ends in the line above###
+
+ansible-playbook ec2-playbook.yml
+
+# Once the EC2s are ready, in control node, create inventory file.
+sudo vi /etc/ansible/hosts
+
+# Add the private IP addresses of your slave EC2s, by pressing "INSERT" 
+< Add Managed Node 1 Private IP >
+< Add Managed Node 2 Private IP >
+172.31.40.86
+172.31.35.157
+
+# Save the file using "ESCAPE + :wq!"
+
+# list your ip addresses
+sudo cat /etc/ansible/hosts
+
+# list all managed node ip addresses.
+ansible all --list-hosts
+
+# SSH into each of them and set the hostnames.
+ssh ec2-user@< Replace Node 1 IP >
+sudo hostnamectl set-hostname managed-node-1
+exit
+
+ssh ec2-user@< Replace Node 2 IP >
+sudo hostnamectl set-hostname managed-node-2
+exit
+
+# Use ping module to check if the managed nodes are able to interpret the ansible modules
+ansible all -m ping
+
+
+
+Task 3: Playbook to install apache web server
+=============================================
+cd ~/
+mkdir start-apache && cd start-apache
+vi install-apache-server.yml
+
+# Add the given content, by pressing "INSERT"
+---
+- name: I am adding this play to install apache web servers on all the hosts
+  hosts: all
+  become: yes
+  tasks:
+    - name: Task1 - install httpd using yum
+      yum:
+        name: httpd
+        #local cache of the package information available from the repositories configured on the system
+        update_cache: yes
+        state: latest
+    - name: Task2 - upload custom index.html into all hosts
+      copy:
+        src: /home/ec2-user/start-apache/index.html
+        dest: /var/www/html
+    - name: Task3 - setup/modify file attributes
+      file:
+        path: /var/www/html/index.html
+        owner: apache
+        group: apache
+        mode:  0644
+    - name: Task4 will start the httpd
+      service:
+        name: httpd
+        state: started
+
+# save the file using "ESCAPE + :wq!"
+
+# State as 'Present' and 'Installed' are used interchangeably. They both do the same thing i.e. It 
+# will ensure that a desired package is installed. Whereas State as 'Latest' means in addition
+# to installation, it will go ahead and update if it is not of the latest available version.
+
+# Now lets create an index.html file to be used as the landing page for the web server.
+# In task2 of the above playbook, this 'index.html' will be copied to the document root of the 
+# httpd server.
+
+vi index.html
+
+# Add the given content, by pressing "INSERT" 
+
+<html>
+  <body>
+  <h1>Welcome to Ansible Learning!</h1>
+  <h2> Today is June 23rd, 2024 </h2>
+  </body>
+</html>
+
+# save the file using "ESCAPE + :wq!"
+
+# Now run the playbook so that it installs httpd to all the hosts and index.html is copied from 
+# the ansible-control
+ansible-playbook install-apache-server.yml
+
+# Go to aws console. Copy 'Public IPv4 DNS' name from the instance details.
+# Paste that into a browser and observe that the web page is coming up
+
+
+Task 4: CleanUp
+===============
+Terminate all EC2s launched.
+
+
+
+
