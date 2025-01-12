@@ -1,0 +1,32 @@
+
+YT Video Link: https://youtu.be/jQYZEepNY8A
+Topic: Load Balancer HandsOn
+
+Steps:
+
+1. Create a Launch template. Use Ubuntu.
+ 
+2. Add the below in user data.
+
+#!/bin/bash
+sudo apt-get update
+sudo apt-get -y install nginx
+MYIP=$(hostname -I)
+echo "<html>  <body bgcolor = brown>  <center><h1>Welcome to Unus's page</h1>
+<hr width = 28%> </center>
+<br><br> <font color=black size=8> IP address of this machine is:<b> $MYIP </b></font> 
+<br><br> </body>  </html>"  > /var/www/html/index.html
+
+3. Create auto scaling group using the template
+AZ and subnets - choose from 2 AZs
+Load Balancer - attach to a new load balancer
+ELB name: elb-for-asg1
+internet-facing
+new target group name: elb-for-asg1-tg
+Desired capacity: 2; Min 2; Max 2
+
+4. Start a load balancer as part of ASG
+
+5. Copy ELB DNS Name onto the browser address. View the webpage. with every refresh, 
+   IP address alternates. 
+
