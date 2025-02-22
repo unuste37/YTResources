@@ -1,0 +1,126 @@
+############################
+2. CDK Lab 1 - Create hello world lambda function with CDK
+############################
+1. Open cloud9
+cdk --version
+2.179.1 # this will change with time
+
+# If cdk is already installed, skip the below step.
+2. Installation
+sudo yum install npm -y
+sudo npm install aws-cdk 
+
+3. Create CDK project
+Ref: https://docs.aws.amazon.com/cdk/v2/guide/hello_world.html
+
+mkdir hello-cdk && cd hello-cdk
+
+4. Initialise with the selected language
+cdk init app --language python
+
+#After the app has been created, also enter the following two commands. 
+5. Activate the app's Python virtual environment and installs the AWS 
+   CDK core dependencies.
+source .venv/bin/activate # On Windows, run `.\venv\Scripts\activate` instead
+
+6. Find pip3 version
+pip3 --version
+pip 21.3.1
+
+# If pip21.3.1 is running, then upgrade pip version with below command:
+# Install latest PIP version 25
+/home/ec2-user/environment/hello-cdk/.venv/bin/python -m pip install --upgrade pip
+#if you are already in hello-cdk, then:
+python -m pip install --upgrade pip
+
+pip3 --version
+pip 25.0.1
+
+7. For installation of dependencies/other components like aws-cdk: 
+# The requirements.txt contains dependencies specific to your AWS CDK project 
+# (e.g., aws-cdk-lib, constructs).
+python -m pip install -r requirements.txt
+
+
+8. Bootstrap your AWS environment
+
+# The cdk bootstrap command is used in CDK to set up the necessary resources in your AWS environment 
+# before deploying CDK applications. It creates an AWS CDK Toolkit stack in your AWS account, which includes:
+# a) S3 Bucket – Stores assets like Lambda deployment packages and Docker images.  b) IAM Roles – Provides 
+# necessary permissions for CDK to deploy resources.  c) ECR Repository (if needed) – Stores container images 
+# for AWS Fargate or Lambda functions.  d) Other Metadata Resources – Helps manage CDK apps.
+cdk bootstrap
+
+# The CDK CLI obtains environment information from your project. When you bootstrap outside of a 
+# CDK project, you must provide environment information with the CDK bootstrap command. 
+ 
+
+9. Build your CDK App
+# remove existing stack file template
+rm hello_cdk/hello_cdk_stack.py
+
+# Add the stack file hello_cdk/hello_cdk_stack.py
+nano hello_cdk/hello_cdk_stack.py
+# add below code
+
+###code starts###
+from aws_cdk import (
+  Stack,
+  aws_lambda as _lambda, # Import the Lambda module
+  CfnOutput
+)
+from constructs import Construct
+
+class HelloCdkStack(Stack):
+
+  def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    super().__init__(scope, construct_id, **kwargs)
+
+    # Define the Lambda function resource
+    my_function = _lambda.Function(
+      self, "HelloWorldFunction", 
+      runtime = _lambda.Runtime.NODEJS_20_X, # Provide any supported Node.js runtime
+      handler = "index.handler",
+      code = _lambda.Code.from_inline(
+        """
+        exports.handler = async function(event) {
+          return {
+            statusCode: 200,
+            body: JSON.stringify('Hello World!'),
+          };
+        };
+        """
+      ),
+    )
+    # Define the Lambda function URL resource
+    my_function_url = my_function.add_function_url(
+      auth_type = _lambda.FunctionUrlAuthType.NONE,
+    )
+
+    # Define a CloudFormation output for your URL
+    CfnOutput(self, "myFunctionUrlOutput", value=my_function_url.url)
+
+###code ends###
+
+
+10. Synthesize the stack (Compile the CDK code)
+cdk synth
+
+
+11. Deploy the stack
+cdk deploy
+
+
+12. Test your resources
+Go to Lambda console. select your newly created lambda function. Use test utility to test it.
+
+It should display success message
+
+
+13. Delete the App
+cdk destroy
+y
+
+
+
+
