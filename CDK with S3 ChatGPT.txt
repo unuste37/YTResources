@@ -1,0 +1,94 @@
+
+############################
+Create an S3 bucket with Python CDK 
+############################
+We will start by opening your cloud9
+
+1. Open cloud9
+    cdk --version
+    2.179.1
+
+2. Make directory s3-cdk 
+    mkdir s3-cdk && cd s3-cdk
+
+3. Initialize with the selected language
+cdk init app --language python
+
+Check the files created - requirements.txt and app.py
+
+4. Now activate the app's Python virtual environment 
+source .venv/bin/activate 
+
+# Install the dependencies specified in requirements.txt
+python -m pip install -r requirements.txt
+
+
+5. Bootstrap your AWS environment
+
+# The cdk bootstrap command is used in CDK to set up the necessary resources in your AWS environment 
+# before deploying CDK applications. It creates an AWS CDK Toolkit stack in your AWS account, which includes:
+# a) S3 Bucket – Stores assets like Lambda deployment packages and Docker images.  b) IAM Roles – Provides 
+# necessary permissions for CDK to deploy resources.  c) ECR Repository (if needed) – Stores container images 
+# for AWS Fargate or Lambda functions.  d) Other Metadata Resources – Helps manage CDK apps.
+cdk bootstrap
+
+
+6. Build your CDK App
+
+# list the CDK stacks in your app
+cdk list
+#output : S3CdkStack
+# alternatively you can check app.py file in the project directory which gives the stack name
+
+# remove existing stack file template
+cat s3_cdk/s3_cdk_stack.py
+rm s3_cdk/s3_cdk_stack.py
+
+
+7. Get code from ChatGPT
+Give me code for creating an S3 bucket  with CDK v2. Bucket name is Feb4244. Region is us-east-1. Use all default configuration.
+
+
+8. Create the CDK app based on code received from ChatGPT
+
+nano s3_cdk/s3_cdk_stack.py
+
+##code starts##
+from aws_cdk import (
+    Stack,
+    aws_s3 as s3
+)
+from constructs import Construct
+
+class S3CdkStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+
+        # Create an S3 bucket with default settings
+        s3.Bucket(
+            self, "Feb4244Bucket",
+            bucket_name="feb4244"
+        )
+
+# Create the CDK app and deploy the stack
+from aws_cdk import App
+app = App()
+S3CdkStack(app, "S3CdkStack", env={'region': 'us-east-1'})
+app.synth()
+##code ends##
+
+
+9.  Deploy the stack
+cdk deploy
+
+
+10. Test your resources
+Go to S3 and check the bucket
+
+
+11. Delete the App
+cdk destroy
+y
+
+
+
