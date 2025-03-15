@@ -1,0 +1,171 @@
+
+Lab: Setup Cognito User Pool for your application
+======================
+
+Task 1: Launch a simple App on Amplify
+======================
+#create index.html, after_login.html and after_logout.html
+
+1. Create index.html
+
+###index.html###
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sign Up / Sign In Page</title>
+</head>
+<body>
+
+  <h1>Welcome to my website</h1>
+  <p><a href="#">Login To App</a></p>
+
+</body>
+</html>
+###code ends###
+
+2. Create after_login.html
+
+###after_login.html###
+<!DOCTYPE html>
+<html>
+<head>
+  <title>After Login </title>
+</head>
+<body>
+
+  <h1>Congratulations!</h1>
+  <p>You are logged in Now!!</p>
+
+<br><br>
+<hr width=70%>
+
+  <h1>Registration Form</h1>
+
+  <form action="#" method="POST">
+      <label for="name">First Name:</label>
+      <input type="text" id="name" name="name" required><br><br>
+
+      <label for="course">Course:</label>
+      <!--<input type="text" id="course" name="course" required><br><br>-->
+      <select id="course" name="course" required>
+          <option value="TechEssentials">TechEssentials</option>
+          <option value="ServerlessSolutions">ServerlessSolutions</option>
+      </select><br><br>
+
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required><br><br>
+
+      <button type="submit">Submit</button>
+  </form>
+
+  <a href="#">Logout</a>
+
+</body>
+</html>
+###code ends###
+
+
+3. Create after_logout.html
+###after_logout.html###
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Logged Out Page</title>
+</head>
+<body>
+
+  <h2>You are logged out!!!</h2>
+  <p><a href="#">Log back in</a></p>
+
+</body>
+</html>
+###code ends###
+
+4. Create index.zip including the 3 files.
+zip index.zip after_logout.html after_login.html index.html 
+
+5. Deploy in amplify
+app name: UserRegn
+stage: dev
+
+5. Access the main page of the app:
+https://dev.dd5hmk4i15c2l.amplifyapp.com/ (get this from amplify)
+# Note: The part 'dd5hmk4i15c2l' is the App Id. You will get it 
+# after amplify deployment
+
+6. Check login page and logout page separately
+
+https://dev.d349j0cernptru.amplifyapp.com/after_login 
+https://dev.d349j0cernptru.amplifyapp.com/after_logout
+
+
+Task 2:Create Cognito User Pool
+=============================
+7. Now - go to Cognito console
+Create user pool
+name: give same name as amplify app name
+
+sign in identifiers - email
+select attributes - name and email
+
+8.
+return URL: add the after_login page
+Copy your application main page add 'after_login' at the end
+https://dev.d349j0cernptru.amplifyapp.com/after_login
+create user directory
+
+9 Left side menu click 'Authentication Methods'
+Password policy > edit; Choose Custom
+remove the need for 1 special character
+prevent reuse of 1 previous passwords
+Save Changes after editing
+
+10. Click on App clients on left side menu
+select the app client already created - UserRegn
+ 
+Select 'login pages' > Managed login pages configuration > edit
+Under Managed login pages configuration, Allowed callback URL will appear
+https://dev.dd5hmk4i15c2l.amplifyapp.com/after_login
+No need to change it. It is already updated.
+
+11. In the same section, Add sign-out URL:
+Copy the 'Callback URL' from above and change 'after_login' to 'after_logout'
+https://dev.d1t1r238wqew7o.amplifyapp.com/after_logout
+
+Save changes  (at the bottom of page)
+
+
+Task 3: Make changes to the code
+========================
+12.In index.html, change the register/login page address. 
+Get this from Cognito > App Clients > Managed login pages configuration> View login page.
+
+https://us-east-1t2ipewi03.auth.us-east-1.amazoncognito.com/login?client_id=3ilglkp4tvv3ooi1f5main1ond&response_type=code&scope=email+openid+phone&redirect_uri=https%3A%2F%2Fdev.d349j0cernptru.amplifyapp.com%2Fafter_login
+
+
+13. In after_logout.html, edit the link to Sign in page as above (Link to: Log Back In)
+https://us-east-1t2ipewi03.auth.us-east-1.amazoncognito.com/login?client_id=3ilglkp4tvv3ooi1f5main1ond&response_type=code&scope=email+openid+phone&redirect_uri=https%3A%2F%2Fdev.d349j0cernptru.amplifyapp.com%2Fafter_login
+
+
+14. In after_login.html, edit the link to Logout (Allow user to logout of the app)
+copy the same login page URL as above. 
+https://us-east-1pfmbiz6ca.auth.us-east-1.amazoncognito.com/login?client_id=nuo948ihfduqcfjkodeihe7fd&response_type=code&scope=email+openid+phone&redirect_uri=https%3A%2F%2Fdev.dd5hmk4i15c2l.amplifyapp.com%2Fafter_login
+
+change 'login' to 'logout'.
+then, remove response_type=code&scope=email+openid+phone
+then, change redirect_uri to logout_uri
+then, change after_login to after_logout
+
+after changes:
+https://us-east-1pfmbiz6ca.auth.us-east-1.amazoncognito.com/logout?client_id=nuo948ihfduqcfjkodeihe7fd&logout_uri=https%3A%2F%2Fdev.dd5hmk4i15c2l.amplifyapp.com%2Fafter_logout
+
+
+15. Create the new zip file
+
+16. redeploy the app
+
+17. Now test the app
+
+
+
+
